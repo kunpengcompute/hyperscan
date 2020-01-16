@@ -1,17 +1,11 @@
 os:
-  - centos
   - linux
 
 arch:
   - arm64
 
-addons:
-  hosts:
-    - node1
-
 language: 
   - c
-  - C++
   
 script:  
   - cd ..
