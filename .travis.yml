@@ -9,7 +9,7 @@ script:
   - cd ../
   - wget https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz
   - tar -zxf boost_1_69_0.tar.gz
-  - ln -s boost_1_69_0/boost ./hyperscan/include/boost
+  - ln -s /home/travis/build/tqltech/boost_1_69_0/boost ./hyperscan/include/boost
   
   - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
   - tar -zxf ragel-6.10.tar.gz
