@@ -6,17 +6,22 @@ addons:
     - node1
 
 script:
-  - sudo apt-get install  libboost-atomic1.58-dev
+  - cd ../
+  - wget https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz
+  - tar -zxf boost_1_69_0.tar.gz
+  - ln -s boost_1_69_0/boost ./hyperscan/include/boost
+  
   - sudo apt-get install ragel
   
-  - sudo mkdir pcre_install
-  - sudo cd pcre_install
-  - sudo wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
-  - sudo tar -zxf pcre-8.43.tar.gz
-  - sudo cp -rf ./pcre-8.43 ../pcre
+  - wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
+  - tar -zxf pcre-8.43.tar.gz
+  - sudo cp -rf ./pcre-8.43 ./hyperscan/pcre
   
+  - cd ./hyperscan
   - rm -rf build
   - mkdir build
   - cd build
   - cmake .. 
   - make -j16
+  - sudo ./bin/unit-hyperscan
+  
