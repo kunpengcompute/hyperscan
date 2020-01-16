@@ -11,7 +11,12 @@ script:
   - tar -zxf boost_1_69_0.tar.gz
   - ln -s boost_1_69_0/boost ./hyperscan/include/boost
   
-  - sudo apt-get install ragel
+  - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
+  - tar -zxf ragel-6.10.tar.gz
+  - cd ./ragel-6.10
+  - sudo ./configure
+  - make -j16
+  - make install
   
   - wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
   - tar -zxf pcre-8.43.tar.gz
