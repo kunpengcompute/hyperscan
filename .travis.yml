@@ -19,7 +19,7 @@ script:
   - tar -zxf ragel-6.10.tar.gz
   - cd ./ragel-6.10
   - sudo ./configure
-  - sudo make -j16
+  - sudo make -j32
   - sudo make install
   
   - cd ../
@@ -32,6 +32,6 @@ script:
   - mkdir build
   - cd build
   - cmake .. 
-  - make -j16
+  - make -j32
   - sudo ./bin/unit-hyperscan
   
