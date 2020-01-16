@@ -9,7 +9,6 @@ script:
   - gcc -v
   - cmake --version
   - python --version
-  
   - rm -rf build
   - mkdir build
   - cd build
