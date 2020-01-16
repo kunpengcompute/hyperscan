@@ -7,6 +7,8 @@ addons:
     - node1
 
 script:
-  - sudo cat /proc/cpuinfo
-  - lscpu
-  - uname -a
+  - rm -rf build
+  - mkdir build
+  - cd build
+  - cmake .. 
+  - make -j16
