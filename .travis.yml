@@ -1,9 +1,7 @@
-language: 
-  - C
-  - C++
+language: C++
 
 os:
-  -linux
+  - linux
   
 arch:
   - arm64
