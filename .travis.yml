@@ -1,6 +1,7 @@
 os:
+  - centos
   - linux
-  
+
 arch:
   - arm64
 
@@ -8,8 +9,10 @@ addons:
   hosts:
     - node1
 
-language: c
-
+language: 
+  - c
+  - C++
+  
 script:  
   - cd ..
   - sudo apt-get install libboost-dev
