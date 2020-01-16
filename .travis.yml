@@ -6,14 +6,11 @@ addons:
     - node1
 
 script:
+  
   - cd ../
   - wget https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz
   - tar -zxf boost_1_69_0.tar.gz
-  - cd boost_1_69_0
-  - sh bootstrap.sh --with-libraries=all -with-toolset=gcc
-  - sudo ./b2 toolset=gcc
-  - sudo ./b2 install --prefix=/usr
-  - ldconfig  
+  - ln -s /home/travis/build/tqltech/boost_1_69_0/boost ./hyperscan/include/boost
 
   - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
   - tar -zxf ragel-6.10.tar.gz
