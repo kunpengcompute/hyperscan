@@ -4,8 +4,12 @@ os:
 arch:
   - arm64
 
+addons:
+  hosts:
+    - node2
+
 language: 
-  - c
+  - c++
   
 script:  
   - cd ..
