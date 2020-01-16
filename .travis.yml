@@ -6,9 +6,14 @@ addons:
     - node1
 
 script:
-  - sudo apt-get install libboost-all-dev
+  - sudo apt-get install  libboost-atomic1.58-dev
   - sudo apt-get install ragel
-  - sudo apt-get install libpcre3-dev
+  
+  - sudo mkdir pcre_install
+  - sudo cd pcre_install
+  - sudo wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
+  - sudo tar -zxf pcre-8.43.tar.gz
+  - sudo cp -rf ./pcre-8.43 ../pcre
   
   - rm -rf build
   - mkdir build
