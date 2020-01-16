@@ -6,11 +6,10 @@ addons:
     - node1
 
 script:
-  - apt-get install libboost-all-dev
-  - apt-get install ragel
-  - apt-get install libpcre3-dev
+  - sudo apt-get install libboost-all-dev
+  - sudo apt-get install ragel
+  - sudo apt-get install libpcre3-dev
   
-  - cd ../
   - rm -rf build
   - mkdir build
   - cd build
