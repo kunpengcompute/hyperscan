@@ -6,28 +6,9 @@ addons:
     - node1
 
 script:
-  - mkdir boost
-  - cd boost
-  - wget https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz
-  - tar -zxf boost_1_69_0.tar.gz
-  - ln -s boost_1_69_0/boost ../include/boost
-  
-  - cd ../ 
-  - mkdir ragel
-  - cd ragel
-  - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
-  - tar -zxf ragel-6.10.tar.gz
-  - cd ./ragel-6.10
-  - ./configure
-  - make
-  - make install
-  
-  - cd ../../
-  - mkdir pcre_install
-  - cd pcre_install
-  - wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
-  - tar -zxf pcre-8.43.tar.gz
-  - cp -rf ./pcre-8.43 ../pcre
+  - apt-get install libboost-all-dev
+  - apt-get install ragel
+  - apt-get install libpcre3-dev
   
   - cd ../
   - rm -rf build
