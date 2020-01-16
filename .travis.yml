@@ -8,10 +8,11 @@ addons:
   hosts:
     - node1
 
-language: c++
+language: c
 
 script:  
-  - sudo apt-get install libboost-all-dev
+  - cd ..
+  - sudo apt-get install libboost-dev
 
   - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
   - tar -zxf ragel-6.10.tar.gz
