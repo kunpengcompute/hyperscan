@@ -1,0 +1,12 @@
+arch:
+  - arm64
+  - amd64
+
+addons:
+  hosts:
+    - node1
+
+script:
+  - sudo cat /proc/cpuinfo
+  - lscpu
+  - uname -a
