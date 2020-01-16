@@ -18,6 +18,7 @@ script:
   - sudo make -j16
   - sudo make install
   
+  - cd ../
   - wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
   - tar -zxf pcre-8.43.tar.gz
   - sudo cp -rf ./pcre-8.43 ./hyperscan/pcre
