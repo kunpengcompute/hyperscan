@@ -1,5 +1,3 @@
-language: C++
-
 os:
   - linux
   
@@ -10,12 +8,10 @@ addons:
   hosts:
     - node1
 
-script:
-  
-  - cd ../
-  - wget https://dl.bintray.com/boostorg/release/1.71.0/source/boost_1_71_0.tar.gz
-  - tar -zxf boost_1_71_0.tar.gz
-  - ln -s /home/travis/build/tqltech/boost_1_71_0/boost ./hyperscan/include/boost
+language: c++
+
+script:  
+  - sudo apt-get install libboost-all-dev
 
   - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
   - tar -zxf ragel-6.10.tar.gz
