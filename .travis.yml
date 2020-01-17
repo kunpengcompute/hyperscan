@@ -2,7 +2,7 @@ os:
   - linux
 
 arch:
-  - x86
+  - arm64
 
 addons:
   apt:
