@@ -36,10 +36,10 @@ script:
   - rm -rf build
   - mkdir build
   - cd build
-  - cmake .. -DCMAKE_CXX_FLAGS=-std=c++17
+  - cmake ..
   - make -j8
   - sudo ./bin/unit-hyperscan
   - sudo ./bin/unit-chimera
-  - sudo ./bin/hscheck -s ./tools/hscollider/test_cases/signatures/collider_tests.txt
+  - sudo ./bin/hscheck -s ./../tools/hscollider/test_cases/signatures/collider_tests.txt
   - sudo make collide_quick_test
   - sudo make collide_quick_test_block
