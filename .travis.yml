@@ -1,16 +1,14 @@
-before_install:
-  - sudo apt-get -y install libxml2-dev
+os:
+  - linux
+
+arch:
+  - arm64
 
 addons:
   apt:
     update: true
   hosts:
     - node2
-os:
-  - linux
-
-arch:
-  - arm64
 
 language: 
   - c++
@@ -26,16 +24,10 @@ script:
   - sudo make -j32
   - sudo make install
   
-  - cd ../
-  - wget https://sourceforge.net/projects/pcre/files/pcre/8.43/pcre-8.43.tar.gz
-  - tar -zxf pcre-8.43.tar.gz
-  - sudo cp -rf ./pcre-8.43 ./hyperscan/pcre
-  
-  - cd ./hyperscan
+  - cd ./../hyperscan
   - rm -rf build
   - mkdir build
   - cd build
   - cmake .. 
   - make -j32
   - sudo ./bin/unit-hyperscan
-  
