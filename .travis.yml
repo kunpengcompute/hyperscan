@@ -28,6 +28,6 @@ script:
   - rm -rf build
   - mkdir build
   - cd build
-  - cmake .. 
+  - cmake .. -DCMAKE_CXX_FLAGS -std=c++11
   - make -j8
   - sudo ./bin/unit-hyperscan
