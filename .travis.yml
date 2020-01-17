@@ -1,12 +1,16 @@
+before_install:
+  - sudo apt-get -y install libxml2-dev
+
+addons:
+  apt:
+    update: true
+  hosts:
+    - node2
 os:
   - linux
 
 arch:
   - arm64
-
-addons:
-  hosts:
-    - node2
 
 language: 
   - c++
