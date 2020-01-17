@@ -26,10 +26,19 @@ script:
   - sudo make -j16
   - sudo make install
   
-  - cd ./../hyperscan
+  - cd ../
+  - wget https://nchc.dl.sourceforge.net/project/pcre/pcre/8.43/pcre-8.43.tar.gz
+  - tar -zxf pcre-8.43.tar.gz
+  - sudo cp -rf ./pcre-8.43 ./hyperscan/pcre
+  
+  - cd ./hyperscan
   - rm -rf build
   - mkdir build
   - cd build
   - cmake .. -DCMAKE_CXX_FLAGS=-std=c++17
   - make -j8
   - sudo ./bin/unit-hyperscan
+  - sudo ./bin/unit-chimera
+  - sudo ./bin/hscheck -s ./tools/hscollider/test_cases/signatures/collider_tests.txt
+  - sudo make collide_quick_test
+  - sudo make collide_quick_test_block
