@@ -1,0 +1,45 @@
+dist: bionic
+
+os:
+  - linux
+
+arch:
+  - arm64 
+  - x86
+
+addons:
+  apt:
+    update: true
+  hosts:
+    - node2
+
+language: 
+  - c++
+  
+script:  
+  - cd ..
+  - sudo apt-get install libboost-dev
+
+  - wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
+  - tar -zxf ragel-6.10.tar.gz
+  - cd ./ragel-6.10
+  - sudo ./configure
+  - sudo make -j16
+  - sudo make install
+  
+  - cd ../
+  - wget https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.gz
+  - tar -zxvf pcre-8.41.tar.gz
+  - sudo cp -rf ./pcre-8.41 ./hyperscan/pcre
+  
+  - cd ./hyperscan
+  - rm -rf build
+  - mkdir build
+  - cd build
+  - cmake ..
+  - make -j8
+  - sudo ./bin/unit-hyperscan
+  - sudo ./bin/unit-chimera
+  - sudo ./bin/hscheck -s ./../tools/hscollider/test_cases/signatures/collider_tests.txt
+  - sudo make collide_quick_test
+  - sudo make collide_quick_test_block
