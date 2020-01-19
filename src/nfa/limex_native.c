@@ -77,7 +77,7 @@ int processExceptional32(u32 s, u32 estate, UNUSED u32 diffmask, u32 *succ,
                          struct NFAContext32 *ctx, char in_rev, char flags) {
     assert(estate != 0); // guaranteed by calling macro
 
-    if (estate == ctx->cached_estate) {
+    if (unlikely(estate == ctx->cached_estate)) {
         DEBUG_PRINTF("using cached succ from previous state\n");
         *succ |= ctx->cached_esucc;
         if (ctx->cached_reports && (flags & CALLBACK_OUTPUT)) {
@@ -103,21 +103,21 @@ int processExceptional32(u32 s, u32 estate, UNUSED u32 diffmask, u32 *succ,
         u32 bit = findAndClearLSB_32(&estate);
         u32 idx = rank_in_mask32(limex->exceptionMask, bit);
         const struct NFAException32 *e = &exceptions[idx];
-        if (!runException32(e, s, succ, &local_succ, limex, offset, ctx,
-                            &new_cache, &cacheable, in_rev, flags)) {
+        if (unlikely(!runException32(e, s, succ, &local_succ, limex, offset, ctx,
+                            &new_cache, &cacheable, in_rev, flags))) {
             return PE_RV_HALT;
         }
     } while (estate != 0);
 
     *succ |= local_succ;
 
-    if (cacheable == CACHE_RESULT) {
+    if (unlikely(cacheable == CACHE_RESULT)) {
         ctx->cached_estate = orig_estate;
         ctx->cached_esucc = local_succ;
         ctx->cached_reports = new_cache.reports;
         ctx->cached_br = new_cache.br;
     } else if (cacheable == DO_NOT_CACHE_RESULT_AND_FLUSH_BR_ENTRIES) {
-        if (ctx->cached_br) {
+        if (unlikely(ctx->cached_br)) {
             ctx->cached_estate = 0U;
         }
     }

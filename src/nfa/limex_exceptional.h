@@ -129,7 +129,7 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
         union RepeatControl *repeat_ctrl = ctx->repeat_ctrl + info->ctrlIndex;
         char *repeat_state = ctx->repeat_state + info->stateOffset;
 
-        if (e->trigger == LIMEX_TRIGGER_POS) {
+        if (unlikely(e->trigger == LIMEX_TRIGGER_POS)) {
             char cyclic_on = TESTBIT_STATE(*STATE_ARG_P, info->cyclicState);
             processPosTrigger(repeat, repeat_ctrl, repeat_state, offset,
                               cyclic_on);
@@ -138,7 +138,7 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
             assert(e->trigger == LIMEX_TRIGGER_TUG);
             enum TriggerResult rv =
                 processTugTrigger(repeat, repeat_ctrl, repeat_state, offset);
-            if (rv == TRIGGER_FAIL) {
+            if (likely(rv == TRIGGER_FAIL)) {
                 *cacheable = DO_NOT_CACHE_RESULT_AND_FLUSH_BR_ENTRIES;
                 DEBUG_PRINTF("tug found no valid matches in repeat state\n");
                 return 1; // continue
@@ -148,7 +148,7 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
                 assert(e->hasSquash == LIMEX_SQUASH_TUG);
                 *succ = AND_STATE(*succ, LOAD_FROM_ENG(&e->squash));
                 return 1; // continue
-            } else if (rv == TRIGGER_SUCCESS_CACHE) {
+            } else if (unlikely(rv == TRIGGER_SUCCESS_CACHE)) {
                 new_cache->br = 1;
             } else {
                 assert(rv == TRIGGER_SUCCESS);
@@ -158,7 +158,7 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
     }
 
     // Some exceptions fire accepts.
-    if (e->reports != MO_INVALID_IDX) {
+    if (unlikely(e->reports != MO_INVALID_IDX)) {
         if (flags & CALLBACK_OUTPUT) {
             const ReportID *reports =
                 (const ReportID *)((const char *)limex + e->reports);
@@ -169,7 +169,7 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
                 return 0; // halt
             }
             if (*cacheable == CACHE_RESULT) {
-                if (!new_cache->reports || new_cache->reports == reports) {
+                if (likely(!new_cache->reports || new_cache->reports == reports)) {
                     new_cache->reports = reports;
                 } else {
                     *cacheable = DO_NOT_CACHE_RESULT;
@@ -192,8 +192,8 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
 
     // Some exceptions squash states behind them. Note that we squash states in
     // 'succ', not local_succ.
-    if (e->hasSquash == LIMEX_SQUASH_CYCLIC
-        || e->hasSquash == LIMEX_SQUASH_REPORT) {
+    if (unlikely(e->hasSquash == LIMEX_SQUASH_CYCLIC
+        || e->hasSquash == LIMEX_SQUASH_REPORT)) {
         *succ = AND_STATE(*succ, LOAD_FROM_ENG(&e->squash));
         if (*cacheable == CACHE_RESULT) {
             *cacheable = DO_NOT_CACHE_RESULT;
@@ -266,12 +266,12 @@ int PE_FN(STATE_ARG, ESTATE_ARG, u32 diffmask, STATE_T *succ,
             u32 idx = local_index + base_index[t];
             const EXCEPTION_T *e = &exceptions[idx];
 
-            if (!RUN_EXCEPTION_FN(e, STATE_ARG_NAME, succ,
+            if (unlikely(!RUN_EXCEPTION_FN(e, STATE_ARG_NAME, succ,
 #ifndef BIG_MODEL
                                   &local_succ,
 #endif
                                   limex, offset, ctx, &new_cache, &cacheable,
-                                  in_rev, flags)) {
+                                  in_rev, flags))) {
                 return PE_RV_HALT;
             }
         } while (word);
@@ -283,7 +283,7 @@ int PE_FN(STATE_ARG, ESTATE_ARG, u32 diffmask, STATE_T *succ,
     *succ = OR_STATE(*succ, ctx->local_succ);
 #endif
 
-    if (cacheable == CACHE_RESULT) {
+    if (likely(cacheable == CACHE_RESULT)) {
         ctx->cached_estate = estate;
 #ifndef BIG_MODEL
         ctx->cached_esucc = local_succ;
@@ -293,7 +293,7 @@ int PE_FN(STATE_ARG, ESTATE_ARG, u32 diffmask, STATE_T *succ,
         ctx->cached_reports = new_cache.reports;
         ctx->cached_br = new_cache.br;
     } else if (cacheable == DO_NOT_CACHE_RESULT_AND_FLUSH_BR_ENTRIES) {
-        if (ctx->cached_br) {
+        if (unlikely(ctx->cached_br)) {
             ctx->cached_estate = ZERO_STATE;
         }
     }
