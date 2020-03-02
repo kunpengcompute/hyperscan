@@ -26,23 +26,19 @@ The `master` branch on Github/kunpengcompute will always contain the most recent
 release of Intel Hyperscan. 
 
 The `aarch64` branch on Github/kunpengcompute will always contain the most recent 
-release that supports the use of aarch64 architecture. The aarch64 branch was developed
+release that supports the aarch64 architecture. The aarch64 branch was developed
 based on Intel hyperscan 5.2.1. Each version released to `aarch64` branch goes through
 QA and testing before it is released; if you're a user of aarch64, rather than a developer,
 this is the version you should be using.
 
-# Transplant
-
-Add x86 and aarch64 platform judgment branches to the code of aarch64 branch.
-According to the judgment results, choose to perform different operations, 
-including compilation options, detecting specific header files, simd instruction
-judgment, and so on.
+# Porting
+Perform platform-specific different operations, including compilation options, 
+detection specific header files, SIMD instruction judgment, and so on.
 
 # Optimization
-
-Through the use of NEON instructions, inline assembly, data alignment, instruction 
-alignment, memory data prefetching, static branch prediction, code structure 
-optimization, etc., to achieve performance improvements on the Kunpeng platform.
+Improve the Kunpeng platform by using the NEON instructions, inline assembly, 
+data alignment, instruction alignment, memory data prefetching, static branch 
+prediction, code structure optimization, etc.
 
 # Get Involved
 
@@ -50,18 +46,17 @@ The official homepage for Hyperscan is at [www.hyperscan.io](https://www.hypersc
 
 `master` branch
 
-If you have questions or comments, we encourage you to [join the mailing
-list](https://lists.01.org/mailman/listinfo/hyperscan). Bugs can be filed by
-sending email to the list, or by creating an issue on Github.
+If you have questions or comments, we encourage you to [join the mailing list]
+(https://lists.01.org/mailman/listinfo/hyperscan). To file a bug, you can send an email 
+to the list, or create an issue on Github.
 
 If you wish to contact the Hyperscan team at Intel directly, without posting
-publicly to the mailing list, send email to
+publicly to the mailing list, send an email to
 [hyperscan@intel.com](mailto:hyperscan@intel.com).
 
 `aarch64` branch
 
 If you have questions or comments, we encourage you to create an issue on Github.
 
-If you wish to contact the huawei team directly, you can send email to 
+If you wish to contact the Huawei team directly, you can send an email to 
 kunpengcompute@huawei.com.
-
