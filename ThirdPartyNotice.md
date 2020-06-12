@@ -1,12 +1,12 @@
 # THIRD PARTY OPEN SOURCE SOFTWARE NOTICE
-Please note we provide an open source software notice for the third party open source software along with this software and/or this software component contributed by Huawei (in the following just “this SOFTWARE”). The open source software licenses are granted by the respective right holders. 
+Please note we provide an open source software notice for the third party open source software along with this software and/or this software component contributed by Huawei (in the following just “this SOFTWARE”). The open source software licenses are granted by the respective right holders.
 
-# Warranty Disclaimer   
+# Warranty Disclaimer
 THE OPEN SOURCE SOFTWARE IN THIS SOFTWARE IS DISTRIBUTED IN THE HOPE THAT IT WILL BE USEFUL, BUT WITHOUT ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. SEE THE APPLICABLE LICENSES FOR MORE DETAILS.
 
-# Copyright Notice and License Texts 
-Software: hyperscan 5.2.1  
-Copyright notice: 
+# Copyright Notice and License Texts
+Software: hyperscan 5.2.1
+Copyright notice:
 
 Copyright (c) 2015-2019, Intel Corporation
 Copyright (c) 2015-2017, Intel Corporation
@@ -35,7 +35,7 @@ Copyright (c) 2004-2006 Intel Corporation - All Rights Reserved
 Copyright (c) 2019, Intel Corporation
 
 
-License: BSD 3-Clause License 
+License: BSD 3-Clause License
 
 Copyright (c) <YEAR>, <OWNER>
 All rights reserved.

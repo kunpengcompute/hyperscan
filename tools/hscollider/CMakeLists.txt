@@ -26,7 +26,7 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|i386")
     ragelmaker(ColliderCorporaParser.rl)
 endif()
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64") 
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64")
     ragelcopyer(ColliderCorporaParser.rl)
 endif()
 

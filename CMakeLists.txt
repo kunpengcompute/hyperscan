@@ -131,7 +131,7 @@ CMAKE_DEPENDENT_OPTION(DUMP_SUPPORT "Dump code support; normally on, except in r
 
 CMAKE_DEPENDENT_OPTION(DISABLE_ASSERTS "Disable assert(); Asserts are enabled in debug builds, disabled in release builds" OFF "NOT RELEASE_BUILD" ON)
 
-option(BUILD_AVX512 "Experimental: support avx512 in the fat runtime" 
+option(BUILD_AVX512 "Experimental: support avx512 in the fat runtime"
     OFF)
 
 option(WINDOWS_ICC "Use Intel C++ Compiler on Windows, default off, requires ICC to be set in project" OFF)
@@ -182,7 +182,7 @@ else()
         # generic, which isn't very good in some cases. march=native looks at
         # cpuid info and then chooses the best microarch it can (and replaces
         # the flag), so use that for tune.
-        
+
         if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|i386")
             # arg1 might exist if using ccache
             string (STRIP "${CMAKE_C_COMPILER_ARG1}" CC_ARG1)
@@ -205,7 +205,7 @@ else()
             endif()
         endif()
 
-        if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64") 
+        if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64")
             set (EXEC_ARGS ${CC_ARG1} -c -Q --help=target -march=armv8-a -mtune=armv8-a)
         endif()
         set(TUNE_FLAG ${GNUCC_ARCH})
@@ -578,7 +578,7 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|i386")
     ragelmaker(src/parser/Parser.rl)
 endif()
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64") 
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64")
     ragelcopyer(src/parser/Parser.rl)
 endif()
 
@@ -592,7 +592,7 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|i386")
     ragelmaker(src/parser/control_verbs.rl)
 endif()
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64") 
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64")
     ragelcopyer(src/parser/control_verbs.rl)
 endif()
 

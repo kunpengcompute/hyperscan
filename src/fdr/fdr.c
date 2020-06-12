@@ -133,7 +133,7 @@ u64a andn(const u32 a, const u8 *b) {
                          : "=r"(r)
                          : "r"(a), "m"(*(const u32 *)b)
                          : "w0"
-    );	
+    );
 #else
     r = unaligned_load_u32(b) & ~a;
 #endif

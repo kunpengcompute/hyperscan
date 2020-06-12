@@ -4,7 +4,7 @@ os:
   - linux
 
 arch:
-  - arm64 
+  - arm64
   - x86
 
 addons:
@@ -13,10 +13,10 @@ addons:
   hosts:
     - node2
 
-language: 
+language:
   - c
-  
-script:  
+
+script:
   - cd ..
   - sudo apt-get install libboost-dev
 
@@ -26,12 +26,12 @@ script:
   - sudo ./configure
   - sudo make -j16
   - sudo make install
-  
+
   - cd ../
   - wget https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.gz
   - tar -zxvf pcre-8.41.tar.gz
   - sudo cp -rf ./pcre-8.41 ./hyperscan/pcre
-  
+
   - cd ./hyperscan
   - rm -rf build
   - mkdir build
