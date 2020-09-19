@@ -94,6 +94,9 @@ u32 roseCountingMiracleScanShufti(m128 mask_lo, m128 mask_hi, u8 poison,
     u32 count = *count_inout;
 
     const m128 zeroes = zeroes128();
+    #ifdef __x86_64__
+    const m128 low4bits = _mm_set1_epi8(0xf);
+    #endif
     const m128 low4bits = set16x8(0xf);
 
     for (; d + 16 <= d_end; d_end -= 16) {

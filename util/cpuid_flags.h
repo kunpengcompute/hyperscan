@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, Intel Corporation
+ * Copyright (c) 2015-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,26 +26,32 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HS_H_
-#define HS_H_
+#ifndef UTIL_CPUID_H_
+#define UTIL_CPUID_H_
 
-/**
- * @file
- * @brief The complete Hyperscan API definition.
- *
- * Hyperscan is a high speed regular expression engine.
- *
- * This header includes both the Hyperscan compiler and runtime components. See
- * the individual component headers for documentation.
- */
+#include "ue2common.h"
 
-/* The current Hyperscan version information. */
+#if !defined(_WIN32) && !defined(CPUID_H_)
+#if defined(__x86_64__)
+#include <cpuid.h>
+#endif
+ /* system header doesn't have a header guard */
+#define CPUID_H_
+#endif
 
-#define HS_MAJOR      5
-#define HS_MINOR      3
-#define HS_PATCH      0
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
-#include "hs_compile.h"
-#include "hs_runtime.h"
+/* returns HS_CPU_FEATURES_* mask.  */
+u64a cpuid_flags(void);
 
-#endif /* HS_H_ */
+u32 cpuid_tune(void);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
+
+#endif /* UTIL_CPUID_H_ */
+

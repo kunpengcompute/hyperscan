@@ -11,13 +11,7 @@ set_source_files_properties(
     PROPERTIES
     COMPILE_FLAGS "${RAGEL_C_FLAGS}")
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|i386")
-    ragelmaker(ExpressionParser.rl)
-endif()
-
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|AARCH64") 
-    ragelcopyer(ExpressionParser.rl)
-endif()
+ragelmaker(ExpressionParser.rl)
 
 set(expressionutil_SRCS
     expressions.cpp

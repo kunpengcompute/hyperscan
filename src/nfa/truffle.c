@@ -41,7 +41,7 @@
 
 static really_inline
 const u8 *lastMatch(const u8 *buf, u32 z) {
-    if (z != 0xffff) {
+    if (unlikely(z != 0xffff)) {
         u32 pos = clz32(~z & 0xffff);
         assert(pos >= 16 && pos < 32);
         return buf + (31 - pos);
@@ -52,7 +52,7 @@ const u8 *lastMatch(const u8 *buf, u32 z) {
 
 static really_inline
 const u8 *firstMatch(const u8 *buf, u32 z) {
-    if (likely(z != 0xffff)) {
+    if (unlikely(z != 0xffff)) {
         u32 pos = ctz32(~z & 0xffff);
         assert(pos < 16);
         return buf + pos;
@@ -64,6 +64,12 @@ const u8 *firstMatch(const u8 *buf, u32 z) {
 static really_inline
 u32 block(m128 shuf_mask_lo_highclear, m128 shuf_mask_lo_highset, m128 v) {
 
+    #ifdef __x86_64__
+    m128 highconst = _mm_set1_epi8(0x80);
+    m128 shuf_mask_hi = _mm_set1_epi64x(0x8040201008040201);
+    #endif
+    
+    
     m128 highconst = set16x8(0x80);
     m128 shuf_mask_hi = set2x64(0x8040201008040201);
 
@@ -124,7 +130,7 @@ const u8 *truffleExec(m128 shuf_mask_lo_highclear,
     assert(buf < buf_end);
     const u8 *rv;
 
-    if (unlikely(buf_end - buf < 16)) {
+    if (buf_end - buf < 16) {
         return truffleMini(shuf_mask_lo_highclear, shuf_mask_lo_highset, buf,
                            buf_end);
     }

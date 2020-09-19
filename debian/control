@@ -1,16 +1,16 @@
 Source: hyperscan
 Priority: optional
-Maintainer: Robert Haist <rhaist@mailbox.org>
+Maintainer: Robert Haist <rha@debian.org>
 Uploaders: Hilko Bengen <bengen@debian.org>
 Build-Depends: cmake (>=2.8.11),
-               debhelper (>=12),
+               debhelper-compat (=12),
                libboost-dev (>=1.57),
                libpcap-dev,
                pkg-config,
                po-debconf,
                python3,
                ragel (>=6.9)
-Standards-Version: 4.4.1
+Standards-Version: 4.5.0
 Section: libs
 Rules-Requires-Root: no
 Homepage: https://01.org/hyperscan
@@ -19,7 +19,7 @@ Vcs-Browser: https://salsa.debian.org/debian/hyperscan
 
 Package: libhyperscan-dev
 Section: libdevel
-Architecture: any-amd64 i386 kfreebsd-i386 arm64
+Architecture: arm64 any-amd64 i386 kfreebsd-i386
 Depends: libhyperscan5 (= ${binary:Version}), ${misc:Depends}
 Description: Development files for the Hyperscan library
  This package contains development libraries, header files and documentation for

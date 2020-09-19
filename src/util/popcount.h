@@ -41,8 +41,6 @@ u32 popcount32(u32 x) {
 #if defined(HAVE_POPCOUNT_INSTR)
     // Single-instruction builtin.
     return _mm_popcnt_u32(x);
-#elif defined(HAVE_NEON)
-    return (u32)vaddlv_u8(vcnt_u8(vcreate_u8((u64a)x)));
 #else
     // Fast branch-free version from bit-twiddling hacks as older Intel
     // processors do not have a POPCNT instruction.
@@ -65,9 +63,7 @@ u32 popcount64(u64a x) {
     x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
     x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f;
     return (x * 0x0101010101010101) >> 56;
-#endif
-#elif defined(HAVE_NEON)
-    return (u32)vaddlv_u8(vcnt_u8(vcreate_u8((u64a)x)));
+# endif
 #else
     // Synthesise from two 32-bit cases.
     return popcount32(x >> 32) + popcount32(x);
