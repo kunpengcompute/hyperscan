@@ -1,0 +1,36 @@
+# Portuguese translation for hyperscan debconf
+# This file is distributed under the same license as the hyperscan package.
+# Rui Branco <ruipb@debianpt.org>, 2017. Initial translation
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hyperscan 4.4.1-1\n"
+"Report-Msgid-Bugs-To: hyperscan@packages.debian.org\n"
+"POT-Creation-Date: 2016-07-26 23:46+0200\n"
+"PO-Revision-Date: 2017-03-30 16:37+0000\n"
+"Last-Translator: Rui Branco <ruipb@debianpt.org>\n"
+"Language-Team: Portuguese <traduz@debianpt.org>\n"
+"Language: pt\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid "Really install package?"
+msgstr "Tem a certeza que quer instalar o pacote?"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid ""
+"This CPU lacks support for the Supplemental Streaming SIMD Extensions 3 "
+"(SSSE3) instruction set that is required to execute programs linked against "
+"hyperscan."
+msgstr ""
+"Este CPU não possuí suporte a um conjunto de instruções de extensões "
+"Supplemental Streaming SIMD (SSS3) necessário para executar programas "
+"ligados ao hyperscan."
+

@@ -1,0 +1,5 @@
+# Rationale:
+# The original library name libhs4 is to short and could
+# be mistaken. So we changed it to libhyperscan5 for Debian.
+
+libhyperscan5: package-name-doesnt-match-sonames

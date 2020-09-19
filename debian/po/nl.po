@@ -1,0 +1,38 @@
+# Dutch translation of hyperscan debconf templates.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the hyperscan package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# Frans Spiesschaert <Frans.Spiesschaert@yucom.be>, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hyperscan\n"
+"Report-Msgid-Bugs-To: hyperscan@packages.debian.org\n"
+"POT-Creation-Date: 2016-07-26 23:46+0200\n"
+"PO-Revision-Date: 2016-08-03 15:44+0200\n"
+"Last-Translator: Frans Spiesschaert <Frans.Spiesschaert@yucom.be>\n"
+"Language-Team: Debian Dutch l10n Team <debian-l10n-dutch@lists.debian.org>\n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Gtranslator 2.91.6\n"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid "Really install package?"
+msgstr "Dit pakket echt installeren?"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid ""
+"This CPU lacks support for the Supplemental Streaming SIMD Extensions 3 "
+"(SSSE3) instruction set that is required to execute programs linked against "
+"hyperscan."
+msgstr ""
+"Deze CPU biedt geen ondersteuning voor de instructieset 'Supplemental "
+"Streaming SIMD Extensions 3 (SSSE3)'. Die is nodig voor het uitvoeren van "
+"programma's die met hyperscan gelinkt zijn."

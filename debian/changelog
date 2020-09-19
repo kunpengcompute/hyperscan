@@ -1,0 +1,198 @@
+hyperscan (5.2.1-1build1) focal; urgency=medium
+
+  * No-change rebuild for libgcc-s1 package name change.
+
+ -- Matthias Klose <doko@ubuntu.com>  Mon, 23 Mar 2020 19:15:59 +0100
+
+hyperscan (5.2.1-1) unstable; urgency=medium
+
+  * New upstream version 5.2.1
+  * Bump debian standards version to 4.4.1
+  * Add Rules-Requires-Root
+
+ -- Robert Haist <rhaist@mailbox.org>  Fri, 01 Nov 2019 13:11:11 +0100
+
+hyperscan (5.2.0-2) unstable; urgency=medium
+
+  * [a020a6d] Move to python3 (Closes: #936715)
+  * [226de36] Bump debian standards version to 4.4.0
+  * [35a20d1] Bump debhelper version to 12
+
+ -- Robert Haist <rhaist@mailbox.org>  Fri, 06 Sep 2019 16:00:56 +0200
+
+hyperscan (5.2.0-1) unstable; urgency=medium
+
+  * [941c3fe] New upstream version 5.2.0
+
+ -- Robert Haist <rhaist@mailbox.org>  Fri, 23 Aug 2019 15:15:24 +0200
+
+hyperscan (5.1.1-1) unstable; urgency=medium
+
+  * [7912722] New upstream version 5.1.1
+
+ -- Robert Haist <rhaist@mailbox.org>  Mon, 22 Apr 2019 13:38:32 +0200
+
+hyperscan (5.1.0-1) unstable; urgency=medium
+
+  * New upstream version 5.1.0
+  * Bump standards version
+  * Remove duplicate example files
+  * Add libpcap-dev build dependency for examples
+
+ -- Robert Haist <rhaist@mailbox.org>  Thu, 31 Jan 2019 11:35:11 +0100
+
+hyperscan (5.0.0-3) unstable; urgency=medium
+
+  * Add Conflicts/Replaces so that the misnamed libhyperscan4 is removed
+    on upgrades (Closes: #904571)
+
+ -- Hilko Bengen <bengen@debian.org>  Thu, 26 Jul 2018 12:21:35 +0200
+
+hyperscan (5.0.0-2) unstable; urgency=medium
+
+  * Rename libhyperscan4 to libhyperscan5 (Closes: #903675)
+
+ -- Robert Haist <rhaist@mailbox.org>  Sat, 21 Jul 2018 18:36:16 +0200
+
+hyperscan (5.0.0-1) unstable; urgency=medium
+
+  [ Sascha Steinbiss ]
+  * add autopkgtest
+
+  [ Robert Haist ]
+  * Bump debhelper to compat level 11
+  * Bump standards version
+  * d/rules fix lintian debian-rules-uses-unnecessary-dh-argument
+  * d/rules fix lintian debian-rules-is-dh_make-template
+  * New upstream version 5.0.0
+
+ -- Robert Haist <rhaist@mailbox.org>  Tue, 10 Jul 2018 10:54:02 +0200
+
+hyperscan (4.7.0-1) unstable; urgency=medium
+
+  * Add lintian-override for package-name-doesnt-match-sonames
+  * Add Russian translation by Lev Lamberov (Closes: #883142)
+  * d/compat bump to version 10
+  * d/control change upstream github url
+  * d/control increase debhelper dependency version
+  * d/control change alioth to salsa repo
+  * d/control bump standards version to 4.1.3
+  * d/rules use dh_missing
+  * New upstream version 4.7.0
+
+ -- Robert Haist <rhaist@mailbox.org>  Wed, 24 Jan 2018 11:34:53 +0100
+
+hyperscan (4.6.0-1) unstable; urgency=medium
+
+  * New upstream version 4.6.0
+  * Add AVX512 optimisations to fat runtime
+
+ -- Robert Haist <rhaist@mailbox.org>  Sun, 24 Sep 2017 22:22:11 +0200
+
+hyperscan (4.5.2-1) unstable; urgency=medium
+
+  * New upstream version 4.5.2
+  * Bump debian standards versionto 4.0.0
+
+ -- Robert Haist <rhaist@mailbox.org>  Wed, 26 Jul 2017 20:55:04 +0200
+
+hyperscan (4.5.1-1) unstable; urgency=medium
+
+  [ Sascha Steinbiss ]
+  * Non-maintainer upload.
+  * Fix FTBFS on kFreeBSD.
+  * Remove hurd-i386 from list of supported archs.
+
+  [ Robert Haist ]
+  * New upstream version 4.5.1
+  * Remove patch because it went upstream
+
+ -- Robert Haist <rhaist@mailbox.org>  Fri, 16 Jun 2017 21:32:48 +0200
+
+hyperscan (4.5.0-1) unstable; urgency=medium
+
+  * Add portuguese translations thanks to Rui Branco (Closes: #859334)
+  * New upstream version 4.5.0
+  * Fix multiarch directory changes and new example file location
+
+ -- Robert Haist <rhaist@mailbox.org>  Mon, 12 Jun 2017 21:22:30 +0200
+
+hyperscan (4.4.1-1) unstable; urgency=medium
+
+  * Fix overlong changelog line to please lintian
+  * Remove explicit FAT_RUNTIME cmake directive
+  * New upstream version 4.4.1
+
+ -- Robert Haist <rhaist@mailbox.org>  Sat, 04 Mar 2017 17:06:09 +0100
+
+hyperscan (4.4.0-1) unstable; urgency=medium
+
+  [ Robert Haist ]
+  * Add brazilian / portuguese translations thanks to Adriano Rafael Gomes
+    (Closes: #846528)
+  * New upstream version 4.4.0
+
+  [ Sascha Steinbiss ]
+  * use secure Vcs-Git
+  * add missing build-deps
+
+ -- Robert Haist <rhaist@mailbox.org>  Fri, 20 Jan 2017 10:08:50 +0100
+
+hyperscan (4.3.1-1) unstable; urgency=medium
+
+  [ Hilko Bengen ]
+  * Add gbp.conf
+
+  [ Robert Haist ]
+  * New upstream version 4.3.1
+
+ -- Robert Haist <rhaist@mailbox.org>  Mon, 12 Sep 2016 22:28:09 +0200
+
+hyperscan (4.3.0-1) unstable; urgency=medium
+
+  [ Robert Haist ]
+  * Set correct Vcs-Browser link
+  * Added Dutch translations for debconf provided by Frans Spiesschaert
+    (Closes: #834623)
+
+  [ Hilko Bengen ]
+  * New upstream version
+  * Drop reproducible timestamp patch that was integrated upstream
+  * Rename library package to libhyperscan4
+
+ -- Hilko Bengen <bengen@debian.org>  Wed, 24 Aug 2016 23:09:17 +0200
+
+hyperscan (4.2.0-3) unstable; urgency=medium
+
+  [ Robert Haist ]
+  * Fix build errors for gcc 6.1.1 by explicitly setting CMAKE_BUILD_TYPE
+  * Point Vcs-Git & Vcs-Browser to the src pkg git and not to upstream
+
+  [ SZ Lin ]
+  * Added zh_TW translations for debconf
+
+  [ Hilko Bengen ]
+  * Update VCS links to anonscm.debian.org
+  * Add French debconf translation provided by Julien Patriarca (Closes:
+    #833855)
+  * Add German debconf translation
+  * Add myself to Uploaders
+
+ -- Hilko Bengen <bengen@debian.org>  Tue, 09 Aug 2016 22:10:49 +0200
+
+hyperscan (4.2.0-2) unstable; urgency=medium
+
+  [ Eduard Sanou ]
+  * Use SOURCE_DATE_EPOCH as embedded timestamp to make the build
+    reproducible (Closes: #832917).
+
+  [ Robert Haist ]
+  * Fix builds (E-march-native) for i386, kfreebsd-amd64, kfreebsd-i386, x32.
+
+ -- Robert Haist <rhaist@mailbox.org>  Fri, 29 Jul 2016 20:49:09 +0200
+
+hyperscan (4.2.0-1) unstable; urgency=medium
+
+  * Initial release (Closes: #824838)
+
+ -- Robert Haist <rhaist@mailbox.org>  Mon, 25 Jul 2016 16:44:23 +0200
