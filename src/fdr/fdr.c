@@ -353,7 +353,7 @@ static really_inline
 void get_conf_stride_2(const u8 *itPtr, UNUSED const u8 *start_ptr,
                        UNUSED const u8 *end_ptr, u32 domain_mask_flipped,
                        const u64a *ft, u64a *conf0, u64a *conf8, m128 *s) {
-    assert(itPtr >= start_ptr && itPtr + ITER_BYTES <= end_ptr);
+    assert(itPtr >= start_ptr && itPtr <= end_ptr);
     u64a reach0 = andn(domain_mask_flipped, itPtr);
     u64a reach2 = andn(domain_mask_flipped, itPtr + 2);
     u64a reach4 = andn(domain_mask_flipped, itPtr + 4);
@@ -405,7 +405,7 @@ static really_inline
 void get_conf_stride_4(const u8 *itPtr, UNUSED const u8 *start_ptr,
                        UNUSED const u8 *end_ptr, u32 domain_mask_flipped,
                        const u64a *ft, u64a *conf0, u64a *conf8, m128 *s) {
-    assert(itPtr >= start_ptr && itPtr + ITER_BYTES <= end_ptr);
+    assert(itPtr >= start_ptr && itPtr <= end_ptr);
     u64a reach0 = andn(domain_mask_flipped, itPtr);
     u64a reach4 = andn(domain_mask_flipped, itPtr + 4);
     u64a reach8 = andn(domain_mask_flipped, itPtr + 8);
