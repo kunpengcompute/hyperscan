@@ -128,7 +128,7 @@ int RUN_EXCEPTION_FN(const EXCEPTION_T *e, STATE_ARG,
         assert(ctx->repeat_ctrl && ctx->repeat_state);
         union RepeatControl *repeat_ctrl = ctx->repeat_ctrl + info->ctrlIndex;
         char *repeat_state = ctx->repeat_state + info->stateOffset;
-
+     
         if (e->trigger == LIMEX_TRIGGER_POS) {
             char cyclic_on = TESTBIT_STATE(*STATE_ARG_P, info->cyclicState);
             processPosTrigger(repeat, repeat_ctrl, repeat_state, offset,
