@@ -127,6 +127,13 @@ u64a andn(const u32 a, const u8 *b) {
     u64a r;
 #if defined(HAVE_BMI) && !defined(NO_ASM)
     __asm__ ("andn\t%2,%1,%k0" : "=r"(r) : "r"(a), "m"(*(const u32 *)b));
+#elif defined(HAVE_NEON)
+    __asm__ __volatile__("ldr w0, %w2         \n\t"
+                         "bic %w0,w0,%w1      \n\t"
+                         : "=r"(r)
+                         : "r"(a), "m"(*(const u32 *)b)
+                         : "w0"
+    );	
 #else
     r = unaligned_load_u32(b) & ~a;
 #endif
@@ -159,7 +166,104 @@ void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
                        UNUSED const u8 *end_ptr, u32 domain_mask_flipped,
                        const u64a *ft, u64a *conf0, u64a *conf8, m128 *s) {
     /* +1: the zones ensure that we can read the byte at z->end */
-    assert(itPtr >= start_ptr && itPtr + ITER_BYTES <= end_ptr);
+    assert(itPtr >= start_ptr && itPtr <= end_ptr);
+#if defined(HAVE_NEON)
+    domain_mask_flipped = ~domain_mask_flipped;
+
+    u32 reach0, reach1, reach2, reach3;
+    u64a ptr = unaligned_load_u64a(itPtr);
+
+    reach0 = ptr & domain_mask_flipped;
+    reach1 = ptr >> 8 & domain_mask_flipped;
+    reach2 = ptr >> 16 & domain_mask_flipped;
+    reach3 = ptr >> 24 & domain_mask_flipped;
+
+    m128 st0 = load_m128_from_u64a(ft + reach0);
+    m128 st1 = load_m128_from_u64a(ft + reach1);
+    m128 st2 = load_m128_from_u64a(ft + reach2);
+    m128 st3 = load_m128_from_u64a(ft + reach3);
+
+    u32 reach4, reach5, reach6, reach7;
+    ptr = unaligned_load_u64a(itPtr + 4);
+    reach4 = ptr & domain_mask_flipped;
+    reach5 = ptr >> 8 & domain_mask_flipped;
+    reach6 = ptr >> 16 & domain_mask_flipped;
+    reach7 = ptr >> 24 & domain_mask_flipped;
+
+    m128 st4 = load_m128_from_u64a(ft + reach4);
+    m128 st5 = load_m128_from_u64a(ft + reach5);
+    m128 st6 = load_m128_from_u64a(ft + reach6);
+    m128 st7 = load_m128_from_u64a(ft + reach7);
+
+    m128 zero = zeroes128();
+
+    st1.vect_s8 = vextq_s8(zero.vect_s8, st1.vect_s8, 15);
+    st2.vect_s8 = vextq_s8(zero.vect_s8, st2.vect_s8, 14);
+    st3.vect_s8 = vextq_s8(zero.vect_s8, st3.vect_s8, 13);
+    st4.vect_s8 = vextq_s8(zero.vect_s8, st4.vect_s8, 12);
+    st5.vect_s8 = vextq_s8(zero.vect_s8, st5.vect_s8, 11);
+    st6.vect_s8 = vextq_s8(zero.vect_s8, st6.vect_s8, 10);
+    st7.vect_s8 = vextq_s8(zero.vect_s8, st7.vect_s8, 9);
+
+    st0 = or128(st0, st1);
+    st2 = or128(st2, st3);
+    st4 = or128(st4, st5);
+    st6 = or128(st6, st7);
+    st0 = or128(st0, st2);
+    st4 = or128(st4, st6);
+    st0 = or128(st0, st4);
+    *s = or128(*s, st0);
+
+    *conf0 = movq(*s);
+    *s = rshiftbyte_m128(*s, 8);
+    *conf0 = ~(*conf0);
+
+    u32 reach8, reach9, reach10, reach11;
+    ptr = unaligned_load_u64a(itPtr + 8);
+    reach8 = ptr & domain_mask_flipped;
+    reach9 = ptr >> 8 & domain_mask_flipped;
+    reach10 = ptr >> 16 & domain_mask_flipped;
+    reach11 = ptr >> 24 & domain_mask_flipped;
+
+    m128 st8 = load_m128_from_u64a(ft + reach8);
+    m128 st9 = load_m128_from_u64a(ft + reach9);
+    m128 st10 = load_m128_from_u64a(ft + reach10);
+    m128 st11 = load_m128_from_u64a(ft + reach11);
+
+    u32 reach12, reach13, reach14, reach15;
+    ptr = unaligned_load_u64a(itPtr + 12);
+    reach12 = ptr & domain_mask_flipped;
+    reach13 = ptr >> 8 & domain_mask_flipped;
+    reach14 = ptr >> 16 & domain_mask_flipped;
+    reach15 = ptr >> 24 & domain_mask_flipped;
+
+    m128 st12 = load_m128_from_u64a(ft + reach12);
+    m128 st13 = load_m128_from_u64a(ft + reach13);
+    m128 st14 = load_m128_from_u64a(ft + reach14);
+    m128 st15 = load_m128_from_u64a(ft + reach15);
+
+    st9.vect_s8 = vextq_s8(zero.vect_s8, st9.vect_s8, 15);
+    st10.vect_s8 = vextq_s8(zero.vect_s8, st10.vect_s8, 14);
+    st11.vect_s8 = vextq_s8(zero.vect_s8, st11.vect_s8, 13);
+    st12.vect_s8 = vextq_s8(zero.vect_s8, st12.vect_s8, 12);
+    st13.vect_s8 = vextq_s8(zero.vect_s8, st13.vect_s8, 11);
+    st14.vect_s8 = vextq_s8(zero.vect_s8, st14.vect_s8, 10);
+    st15.vect_s8 = vextq_s8(zero.vect_s8, st15.vect_s8, 9);
+
+    st8 = or128(st8, st9);
+    st10 = or128(st10, st11);
+    st12 = or128(st12, st13);
+    st14 = or128(st14, st15);
+    st8 = or128(st8, st10);
+    st12 = or128(st12, st14);
+    st8 = or128(st8, st12);
+    *s = or128(*s, st8);
+
+    *conf8 = movq(*s);
+    *s = rshiftbyte_m128(*s, 8);
+    *conf8 = ~(*conf8);
+
+#else
     u64a reach0 = andn(domain_mask_flipped, itPtr);
     u64a reach1 = andn(domain_mask_flipped, itPtr + 1);
     u64a reach2 = andn(domain_mask_flipped, itPtr + 2);
@@ -241,13 +345,15 @@ void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
     *conf8 = movq(*s);
     *s = rshiftbyte_m128(*s, 8);
     *conf8 ^= ~0ULL;
+
+#endif
 }
 
 static really_inline
 void get_conf_stride_2(const u8 *itPtr, UNUSED const u8 *start_ptr,
                        UNUSED const u8 *end_ptr, u32 domain_mask_flipped,
                        const u64a *ft, u64a *conf0, u64a *conf8, m128 *s) {
-    assert(itPtr >= start_ptr && itPtr + ITER_BYTES <= end_ptr);
+    assert(itPtr >= start_ptr && itPtr <= end_ptr);
     u64a reach0 = andn(domain_mask_flipped, itPtr);
     u64a reach2 = andn(domain_mask_flipped, itPtr + 2);
     u64a reach4 = andn(domain_mask_flipped, itPtr + 4);
@@ -299,7 +405,7 @@ static really_inline
 void get_conf_stride_4(const u8 *itPtr, UNUSED const u8 *start_ptr,
                        UNUSED const u8 *end_ptr, u32 domain_mask_flipped,
                        const u64a *ft, u64a *conf0, u64a *conf8, m128 *s) {
-    assert(itPtr >= start_ptr && itPtr + ITER_BYTES <= end_ptr);
+    assert(itPtr >= start_ptr && itPtr <= end_ptr);
     u64a reach0 = andn(domain_mask_flipped, itPtr);
     u64a reach4 = andn(domain_mask_flipped, itPtr + 4);
     u64a reach8 = andn(domain_mask_flipped, itPtr + 8);
@@ -349,12 +455,12 @@ void do_confirm_fdr(u64a *conf, u8 offset, hwlmcb_rv_t *control,
         u32 bitRem = bit % bucket;
         u32 idx = bitRem;
         u32 cf = confBase[idx];
-        if (!cf) {
+        if (unlikely(!cf)) {
             continue;
         }
         const struct FDRConfirm *fdrc = (const struct FDRConfirm *)
                                         ((const u8 *)confBase + cf);
-        if (!(fdrc->groups & *control)) {
+        if (unlikely(!(fdrc->groups & *control))) {
             continue;
         }
         u64a confVal = unaligned_load_u64a(confLoc + byte - sizeof(u64a) + 1);
@@ -603,7 +709,7 @@ void createEndZone(const u8 *buf, const u8 *begin, const u8 *end,
     assert(z_len > 0);
     size_t iter_bytes_second = 0;
     size_t z_len_first = z_len;
-    if (z_len > ITER_BYTES) {
+    if (unlikely(z_len > ITER_BYTES)) {
         z_len_first = z_len - ITER_BYTES;
         iter_bytes_second = ITER_BYTES;
     }
@@ -637,7 +743,7 @@ void createEndZone(const u8 *buf, const u8 *begin, const u8 *end,
 
     /* copy the last 16 bytes, may overlap with the previous 8 byte write */
     storeu128(z_end_first - sizeof(m128), loadu128(end_first - sizeof(m128)));
-    if (iter_bytes_second) {
+    if (unlikely(iter_bytes_second)) {
         storeu128(z_end - sizeof(m128), loadu128(end - sizeof(m128)));
     }
 
@@ -658,7 +764,7 @@ size_t prepareZones(const u8 *buf, size_t len, const u8 *hend,
     const u8 *ptr = buf + start;
     size_t remaining = len - start;
 
-    if (remaining <= ITER_BYTES) {
+    if (unlikely(remaining <= ITER_BYTES)) {
         /* enough bytes to make only one zone */
         createShortZone(buf, hend, ptr, buf + len, &zoneArr[0]);
         return 1;
@@ -691,13 +797,25 @@ size_t prepareZones(const u8 *buf, size_t len, const u8 *hend,
 
 #define INVALID_MATCH_ID (~0U)
 
+/* add prefetch for aarch64,
+ *- due to gcc4.8.5 do not support builtin_prefetch.
+ */
+#if defined(HAVE_NEON)
+#define PREFETCH __asm__ __volatile__("prfm pldl1keep, %0" ::"Q"(*(itPtr + 256)))
+#define P2ALIGN   __asm__ __volatile__(".p2align 6")
+#else
+#define PREFETCH __builtin_prefetch(itPtr + ITER_BYTES)
+#define P2ALIGN
+#endif
+
 #define FDR_MAIN_LOOP(zz, s, get_conf_fn)                                   \
     do {                                                                    \
+        P2ALIGN;                                                            \
         const u8 *tryFloodDetect = zz->floodPtr;                            \
         const u8 *start_ptr = zz->start;                                    \
-        const u8 *end_ptr = zz->end;                                        \
+        const u8 *end_ptr = zz->end - ITER_BYTES;                           \
                                                                             \
-        for (const u8 *itPtr = start_ptr; itPtr + ITER_BYTES <= end_ptr;    \
+        for (const u8 *itPtr = start_ptr; itPtr <= end_ptr;                 \
             itPtr += ITER_BYTES) {                                          \
             if (unlikely(itPtr > tryFloodDetect)) {                         \
                 tryFloodDetect = floodDetect(fdr, a, &itPtr, tryFloodDetect,\
@@ -707,7 +825,7 @@ size_t prepareZones(const u8 *buf, size_t len, const u8 *hend,
                     return HWLM_TERMINATED;                                 \
                 }                                                           \
             }                                                               \
-            __builtin_prefetch(itPtr + ITER_BYTES);                         \
+            PREFETCH;                                                       \
             u64a conf0;                                                     \
             u64a conf8;                                                     \
             get_conf_fn(itPtr, start_ptr, end_ptr, domain_mask_flipped,     \
@@ -879,3 +997,4 @@ hwlm_error_t fdrExecStreaming(const struct FDR *fdr, const u8 *hbuf,
 
     return ret;
 }
+

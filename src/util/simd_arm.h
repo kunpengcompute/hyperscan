@@ -82,6 +82,64 @@ vmvnq_u64(uint64x2_t a) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wshadow"
 
+static really_inline m128 extbyte_m128(m128 a, m128 b, int imm8) {
+    assert(imm8 >= 0 && imm8 <= 15);
+    m128 result;
+    switch (imm8) {
+        case 0:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 0);
+            break;
+        case 1:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 1);
+            break;
+        case 2:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 2);
+            break;
+        case 3:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 3);
+            break;
+        case 4:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 4);
+            break;
+        case 5:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 5);
+            break;
+        case 6:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 6);
+            break;
+        case 7:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 7);
+            break;
+        case 8:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 8);
+            break;
+        case 9:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 9);
+            break;
+        case 10:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 10);
+            break;
+        case 11:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 11);
+            break;
+        case 12:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 12);
+            break;
+        case 13:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 13);
+            break;
+        case 14:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 14);
+            break;
+        case 15:
+            result.vect_s8 = vextq_s8(a.vect_s8, b.vect_s8, 15);
+            break;
+        default:
+            break;
+    }
+    return result;
+}
+
 static really_inline m128 ones128(void) {
     m128 result;
     result.vect_s32 = vdupq_n_s32(0xFFFFFFFF);
@@ -163,17 +221,21 @@ static really_really_inline u32 movemask128(m128 a) {
 static really_really_inline m128 rshiftbyte_m128(m128 a, int imm8) {
     assert(imm8 >= 0 && imm8 <= 15);
     m128 result;
-    result.vect_s8 = vextq_s8(a.vect_s8, vdupq_n_s8(0), imm8);
+    m128 zeroVect;
+    zeroVect.vect_s8 = vdupq_n_s8(0);
+    result = extbyte_m128(a, zeroVect, imm8);
     return result;
 }
 
 static really_really_inline m128 lshiftbyte_m128(m128 a, int imm8) {
     assert(imm8 >= 0 && imm8 <= 15);
     m128 result;
+    m128 zeroVect;
     if (unlikely(imm8 == 0)) {
         return a;
     }
-    result.vect_s8 = vextq_s8(vdupq_n_s8(0), a.vect_s8, (16 - imm8));
+    zeroVect.vect_s8 = vdupq_n_s8(0);
+    result = extbyte_m128(zeroVect, a, (16 - imm8));
     return result;
 }
 
@@ -219,13 +281,43 @@ static really_inline m128 load_m128_from_u64a(const u64a *p) {
 /*The x86 platform does not perform the lower 2 bit operation.
 If the value of imm exceeds 2 bit, a compilation error occurs.*/
 static really_inline u32 extract32from128(m128 a, int imm) {
-    return vgetq_lane_s32(a.vect_s32, imm & 0x0003);
+    int temp = imm & 0x0003;
+    u32 result;
+    switch (temp) {
+        case 0:
+            result = vgetq_lane_s32(a.vect_s32, 0);
+            break;
+        case 1:
+            result = vgetq_lane_s32(a.vect_s32, 1);
+            break;
+        case 2:
+            result = vgetq_lane_s32(a.vect_s32, 2);
+            break;
+        case 3:
+            result = vgetq_lane_s32(a.vect_s32, 3);
+            break;
+        default:
+            break;
+    }
+    return result;
 }
 
 /*The x86 platform does not perform the lower 1 bit operation.
 If the value of imm exceeds 1 bit, a compilation error occurs.*/
 static really_inline u64a extract64from128(m128 a, int imm) {
-    return vgetq_lane_s64(a.vect_s64, imm & 0x0001);
+    int temp = imm & 0x0001;
+    u64a result;
+    switch (temp) {
+        case 0:
+            result = vgetq_lane_s64(a.vect_s64, 0);
+            break;
+        case 1:
+            result = vgetq_lane_s64(a.vect_s64, 1);
+            break;
+        default:
+            break;
+    }
+    return result;
 }
 
 #define extractlow64from256(a) movq(a.lo)
@@ -234,15 +326,47 @@ static really_inline u64a extract64from128(m128 a, int imm) {
 /*The x86 platform does not perform the lower 2 bit operation.
 If the value of imm exceeds 2 bit, a compilation error occurs.*/
 static really_inline u32 extract32from256(m256 a, int imm) {
-    return vgetq_lane_s32((imm >> 2) ? a.hi.vect_s32 : a.lo.vect_s32,
-                          imm & 0x0003);
+    m128 vect;
+    vect.vect_s32 = (imm >> 2) ? a.hi.vect_s32 : a.lo.vect_s32;
+    int temp = imm & 0x0003;
+    u32 result;
+    switch (temp) {
+        case 0:
+            result = vgetq_lane_s32(vect.vect_s32, 0);
+            break;
+        case 1:
+            result = vgetq_lane_s32(vect.vect_s32, 1);
+            break;
+        case 2:
+            result = vgetq_lane_s32(vect.vect_s32, 2);
+            break;
+        case 3:
+            result = vgetq_lane_s32(vect.vect_s32, 3);
+            break;
+        default:
+            break;
+    }
+    return result;
 }
 
 /*The x86 platform does not perform the lower 1 bit operation.
 If the value of imm exceeds 1 bit, a compilation error occurs.*/
 static really_inline u64a extract64from256(m256 a, int imm) {
-    return vgetq_lane_s64((imm >> 1) ? a.hi.vect_s64 : a.lo.vect_s64,
-                          imm & 0x0001);
+    m128 vect;
+    vect.vect_s64 = (imm >> 1) ? a.hi.vect_s64 : a.lo.vect_s64;
+    int temp = imm & 0x0001;
+    u64a result;
+    switch (temp) {
+        case 0:
+            result = vgetq_lane_s64(vect.vect_s64, 0);
+            break;
+        case 1:
+            result = vgetq_lane_s64(vect.vect_s64, 1);
+            break;
+        default:
+            break;
+    }
+    return result;
 }
 
 static really_inline m128 and128(m128 a, m128 b) {
@@ -355,9 +479,11 @@ static really_inline m128 palignr(m128 a, m128 b, int count) {
     m128 result;
     count = count & 0xff;
     if (likely(count < 16)) {
-        result.vect_s8 = vextq_s8(b.vect_s8, a.vect_s8, count);
+        result = extbyte_m128(b, a, count);
     } else if (count < 32) {
-        result.vect_s8 = vextq_s8(a.vect_s8, vdupq_n_s8(0x0), count - 16);
+        m128 zeroVect;
+        zeroVect.vect_s8 = vdupq_n_s8(0x0);
+        result = extbyte_m128(a, zeroVect, count - 16);
     } else {
         result.vect_s32 = vdupq_n_s32(0);
     }
@@ -1067,3 +1193,4 @@ static really_inline char testbit512(m512 val, unsigned int n) {
 #pragma GCC diagnostic pop
 
 #endif
+
