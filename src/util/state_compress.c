@@ -150,7 +150,7 @@ m128 loadcompressed128_32bit(const void *ptr, m128 mvec) {
     u32 x[4] = { expand32(v[0], m[0]), expand32(v[1], m[1]),
                  expand32(v[2], m[2]), expand32(v[3], m[3]) };
 
-    return set32x4(x[3], x[2], x[1], x[0]);
+    return _mm_set_epi32(x[3], x[2], x[1], x[0]);
 }
 #endif
 
@@ -158,16 +158,22 @@ m128 loadcompressed128_32bit(const void *ptr, m128 mvec) {
 static really_inline
 m128 loadcompressed128_64bit(const void *ptr, m128 mvec) {
     // First, decompose our vectors into 64-bit chunks.
+    //#ifdef __x86_64__
+    //u64a m[2] = { movq(mvec), movq(_mm_srli_si128(mvec, 8)) };
+   // #endif
+        
     u64a m[2] = { movq(mvec), movq(rshiftbyte_m128(mvec, 8)) };
-
     u32 bits[2] = { popcount64(m[0]), popcount64(m[1]) };
     u64a v[2];
 
     unpack_bits_64(v, (const u8 *)ptr, bits, 2);
 
     u64a x[2] = { expand64(v[0], m[0]), expand64(v[1], m[1]) };
-
-    return set64x2(x[1], x[0]);
+   
+   // #ifdef __x86_64__
+   // return _mm_set_epi64x(x[1], x[0]);
+    //#endif
+    return set64x2(x[1],x[0]);
 }
 #endif
 
@@ -264,14 +270,42 @@ m256 loadcompressed256_32bit(const void *ptr, m256 mvec) {
                  expand32(v[6], m[6]), expand32(v[7], m[7]) };
 
 #if !defined(HAVE_AVX2)
-    m256 xvec = { .lo = set32x4(x[3], x[2], x[1], x[0]),
-                  .hi = set32x4(x[7], x[6], x[5], x[4]) };
+    m256 xvec = { .lo = _mm_set_epi32(x[3], x[2], x[1], x[0]),
+                  .hi = _mm_set_epi32(x[7], x[6], x[5], x[4]) };
 #else
     m256 xvec = _mm256_set_epi32(x[7], x[6], x[5], x[4],
                                  x[3], x[2], x[1], x[0]);
 #endif
     return xvec;
 }
+#endif
+
+#if defined(ARCH_64_BIT)
+#ifdef __x86_64__
+static really_inline
+m256 loadcompressed256_64bit(const void *ptr, m256 mvec) {
+    // First, decompose our vectors into 64-bit chunks.
+    u64a m[4];
+    memcpy(m, &mvec, sizeof(mvec));
+
+    u32 bits[4] = { popcount64(m[0]), popcount64(m[1]),
+                    popcount64(m[2]), popcount64(m[3]) };
+    u64a v[4];
+
+    unpack_bits_64(v, (const u8 *)ptr, bits, 4);
+
+    u64a x[4] = { expand64(v[0], m[0]), expand64(v[1], m[1]),
+                  expand64(v[2], m[2]), expand64(v[3], m[3]) };
+
+#if !defined(HAVE_AVX2)
+    m256 xvec = { .lo = _mm_set_epi64x(x[1], x[0]),
+                  .hi = _mm_set_epi64x(x[3], x[2]) }
+#else
+    m256 xvec = _mm256_set_epi64x(x[3], x[2], x[1], x[0]);
+#endif
+    return xvec;
+}
+#endif
 #endif
 
 #if defined(ARCH_64_BIT)
@@ -298,7 +332,7 @@ m256 loadcompressed256_64bit(const void *ptr, m256 mvec) {
 #endif
     return xvec;
 }
-#endif
+#endif 
 
 void loadcompressed256(m256 *x, const void *ptr, const m256 *m,
                        UNUSED u32 bytes) {
@@ -402,9 +436,9 @@ m384 loadcompressed384_32bit(const void *ptr, m384 mvec) {
                   expand32(v[8], m[8]), expand32(v[9], m[9]),
                   expand32(v[10], m[10]), expand32(v[11], m[11]) };
 
-    m384 xvec = { .lo = set32x4(x[3], x[2], x[1], x[0]),
-                  .mid = set32x4(x[7], x[6], x[5], x[4]),
-                  .hi = set32x4(x[11], x[10], x[9], x[8]) };
+    m384 xvec = { .lo = _mm_set_epi32(x[3], x[2], x[1], x[0]),
+                  .mid = _mm_set_epi32(x[7], x[6], x[5], x[4]),
+                  .hi = _mm_set_epi32(x[11], x[10], x[9], x[8]) };
     return xvec;
 }
 #endif
@@ -427,6 +461,11 @@ m384 loadcompressed384_64bit(const void *ptr, m384 mvec) {
                   expand64(v[2], m[2]), expand64(v[3], m[3]),
                   expand64(v[4], m[4]), expand64(v[5], m[5]) };
 
+    #ifdef __x86_64__
+    m384 xvec = { .lo = _mm_set_epi64x(x[1], x[0]),
+                  .mid = _mm_set_epi64x(x[3], x[2]),
+                  .hi = _mm_set_epi64x(x[5], x[4]) };
+    #endif
     m384 xvec = { .lo = set64x2(x[1], x[0]),
                   .mid = set64x2(x[3], x[2]),
                   .hi = set64x2(x[5], x[4]) };
@@ -558,6 +597,12 @@ m512 loadcompressed512_32bit(const void *ptr, m512 mvec) {
     xvec.hi = _mm256_set_epi32(x[15], x[14], x[13], x[12],
                                x[11], x[10], x[9], x[8]);
 #else
+#ifdef __x86_64__
+    xvec.lo.lo = _mm_set_epi32(x[3], x[2], x[1], x[0]);
+    xvec.lo.hi = _mm_set_epi32(x[7], x[6], x[5], x[4]);
+    xvec.hi.lo = _mm_set_epi32(x[11], x[10], x[9], x[8]);
+    xvec.hi.hi = _mm_set_epi32(x[15], x[14], x[13], x[12]);
+#endif
     xvec.lo.lo = set32x4(x[3], x[2], x[1], x[0]);
     xvec.lo.hi = set32x4(x[7], x[6], x[5], x[4]);
     xvec.hi.lo = set32x4(x[11], x[10], x[9], x[8]);
@@ -594,6 +639,12 @@ m512 loadcompressed512_64bit(const void *ptr, m512 mvec) {
     m512 xvec = { .lo = _mm256_set_epi64x(x[3], x[2], x[1], x[0]),
                   .hi = _mm256_set_epi64x(x[7], x[6], x[5], x[4])};
 #else
+#ifdef __x86_64__
+    m512 xvec = { .lo = { _mm_set_epi64x(x[1], x[0]),
+                          _mm_set_epi64x(x[3], x[2]) },
+                  .hi = { _mm_set_epi64x(x[5], x[4]),
+                          _mm_set_epi64x(x[7], x[6]) } };
+#endif
     m512 xvec = { .lo = { set64x2(x[1], x[0]),
                           set64x2(x[3], x[2]) },
                   .hi = { set64x2(x[5], x[4]),

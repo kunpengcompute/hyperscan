@@ -1,0 +1,36 @@
+# Debconf translations for hyperscan.
+# Copyright (C) 2016 THE hyperscan'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the hyperscan package.
+# Adriano Rafael Gomes <adrianorg@debian.org>, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hyperscan\n"
+"Report-Msgid-Bugs-To: hyperscan@packages.debian.org\n"
+"POT-Creation-Date: 2016-07-26 23:46+0200\n"
+"PO-Revision-Date: 2016-11-18 22:14-0200\n"
+"Last-Translator: Adriano Rafael Gomes <adrianorg@debian.org>\n"
+"Language-Team: Brazilian Portuguese <debian-l10n-portuguese@lists.debian."
+"org>\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid "Really install package?"
+msgstr "Realmente instalar o pacote?"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid ""
+"This CPU lacks support for the Supplemental Streaming SIMD Extensions 3 "
+"(SSSE3) instruction set that is required to execute programs linked against "
+"hyperscan."
+msgstr ""
+"Essa CPU não tem suporte ao conjunto de instruções \"Supplemental Streaming "
+"SIMD Extensions 3\" (SSSE3) que é necessário para executar programas "
+"lincados ao hyperscan."

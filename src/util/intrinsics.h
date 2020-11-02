@@ -72,7 +72,7 @@
 #elif defined(USE_ARM_NEON_H)
 #include <arm_neon.h>
 #else
-#error no intrinsics file
+//#error no intrinsics file
 #endif
 
 #endif // INTRINSICS_H

@@ -32,12 +32,10 @@
 #include "ue2common.h"
 #include "cpuid_flags.h"
 
-#if defined(__x86_64__) || defined(_M_X64)
 #if !defined(_WIN32) && !defined(CPUID_H_)
 #include <cpuid.h>
 /* system header doesn't have a header guard */
 #define CPUID_H_
-#endif
 #endif
 
 #ifdef __cplusplus
@@ -45,12 +43,11 @@ extern "C"
 {
 #endif
 
-#if defined(__x86_64__) || defined(_M_X64)
 static inline
 void cpuid(unsigned int op, unsigned int leaf, unsigned int *eax,
            unsigned int *ebx, unsigned int *ecx, unsigned int *edx) {
 #ifndef _WIN32
-    __cpuid_count(op, leaf, *eax, *ebx, *ecx, *edx);
+    //__cpuid_count(op, leaf, *eax, *ebx, *ecx, *edx);
 #else
     int a[4];
     __cpuidex(a, op, leaf);
@@ -60,7 +57,6 @@ void cpuid(unsigned int op, unsigned int leaf, unsigned int *eax,
     *edx = a[3];
 #endif
 }
-#endif
 
 // ECX
 #define CPUID_SSE3 (1 << 0)
@@ -96,18 +92,17 @@ void cpuid(unsigned int op, unsigned int leaf, unsigned int *eax,
 #define CPUID_XCR0_AVX512                                                      \
     (CPUID_XCR0_OPMASK | CPUID_XCR0_ZMM_Hi256 | CPUID_XCR0_Hi16_ZMM)
 
-#if defined(__x86_64__) 
 static inline
 u64a xgetbv(u32 op) {
 #if defined(_WIN32) || defined(__INTEL_COMPILER)
     return _xgetbv(op);
-#elif defined(__x86_64__)
+#else
     u32 a, d;
-    __asm__ volatile (
-            "xgetbv\n"
-            : "=a"(a),
-              "=d"(d)
-            : "c"(op));
+    //__asm__ volatile (
+    //        "xgetbv\n"
+    //        : "=a"(a),
+    //          "=d"(d)
+    //        : "c"(op));
     return ((u64a)d << 32) + a;
 #endif
 }
@@ -193,9 +188,10 @@ int check_avx512(void) {
 
 static inline
 int check_ssse3(void) {
-    unsigned int eax, ebx, ecx, edx;
-    cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-    return !!(ecx & CPUID_SSSE3);
+//    unsigned int eax, ebx, ecx, edx;
+//    cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+//    return !!(ecx & CPUID_SSSE3);
+      return 1;
 }
 
 static inline
@@ -210,16 +206,6 @@ int check_popcnt(void) {
     unsigned int eax, ebx, ecx, edx;
     cpuid(1, 0, &eax, &ebx, &ecx, &edx);
     return !!(ecx & CPUID_POPCNT);
-}
-#endif  //__x86_64__
-
-static inline
-int check_neon(void) {
-#if defined(__aarch64__)
-    return 1;
-#else
-    return 0;
-#endif
 }
 
 #ifdef __cplusplus

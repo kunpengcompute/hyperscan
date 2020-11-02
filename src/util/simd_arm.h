@@ -1193,3 +1193,4 @@ static really_inline char testbit512(m512 val, unsigned int n) {
 #pragma GCC diagnostic pop
 
 #endif
+

@@ -1,0 +1,37 @@
+# Translation of hyperscan debconf templates to Russian.
+# Copyright (C) 2018, Lev Lamberov <dogsleg@debian.org>
+# This file is distributed under the same license as the hyperscan package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hyperscan\n"
+"Report-Msgid-Bugs-To: hyperscan@packages.debian.org\n"
+"POT-Creation-Date: 2016-07-26 23:46+0200\n"
+"PO-Revision-Date: 2017-11-30 11:34+0500\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.4\n"
+"Last-Translator: Lev Lamberov <dogsleg@debian.org>\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Language: ru\n"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid "Really install package?"
+msgstr "Действительно установить этот пакет?"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid ""
+"This CPU lacks support for the Supplemental Streaming SIMD Extensions 3 "
+"(SSSE3) instruction set that is required to execute programs linked against "
+"hyperscan."
+msgstr ""
+"У данного ЦП отсутствует поддержки набора инструкций Supplemental Streaming "
+"SIMD Extensions 3 (SSSE3), который требуется для выполнения программ, "
+"скомпонованных с hyperscan."

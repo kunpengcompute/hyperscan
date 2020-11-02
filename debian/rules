@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DBUILD_STATIC_AND_SHARED=1 \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DBUILD_AVX512=on
+
+override_dh_missing:
+	dh_missing --fail-missing

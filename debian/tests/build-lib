@@ -1,0 +1,21 @@
+#!/bin/sh
+# autopkgtest check: Build a program against libhyperscan and check whether a
+#                    runnable binary is produced.
+# Author: Sascha Steinbiss <satta@debian.org>
+set -e
+
+SRC=$(pwd)/examples/simplegrep.c
+RES=$(pwd)/debian/tests/simplegrep.result
+WORKDIR=$(mktemp -d)
+
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+
+gcc -o simplegrep $SRC $(pkg-config --cflags --libs libhs)
+[ -x simplegrep ]
+echo "build: OK"
+
+echo "barbaz" > 1
+./simplegrep ba 1 > 2
+diff 2 $RES
+echo "run: OK"

@@ -118,7 +118,7 @@ struct NFAException##size {                                                 \
     u32 repeatOffset; /**< offset to NFARepeatInfo, or MO_INVALID_IDX */    \
     u8 hasSquash; /**< from enum LimExSquash */                             \
     u8 trigger; /**< from enum LimExTrigger */                              \
-}__attribute__ ((aligned (16)));                                            \
+};                                                                          \
                                                                             \
 struct LimExNFA##size {                                                     \
     u8 reachMap[N_CHARS]; /**< map of char -> entry in reach[] */           \

@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    install|upgrade)
+        if [ "$DEBIAN_FRONTEND" != noninteractive ] && \
+               [ -f /proc/cpuinfo ] && \
+               ! grep -q '^flags[[:space:]]*:.*[[:space:]]ssse3[[:space:]]' /proc/cpuinfo
+        then
+            . /usr/share/debconf/confmodule
+            db_version 2.0
+            db_input critical libhyperscan/cpu-ssse3 || true
+            db_go
+            db_get libhyperscan/cpu-ssse3
+            if [ "$RET" = 'false' ]; then
+                echo 'Aborting installation because of missing SSSE3 extension.' >&2
+                db_purge
+                exit 1
+            fi
+        fi
+    ;;
+
+    abort-upgrade)
+    ;;
+
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

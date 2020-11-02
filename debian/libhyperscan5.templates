@@ -1,0 +1,7 @@
+Template: libhyperscan/cpu-ssse3
+Type: boolean
+Default: false
+_Description: Really install package?
+ This CPU lacks support for the Supplemental Streaming SIMD Extensions
+ 3 (SSSE3) instruction set that is required to execute programs linked
+ against hyperscan.
