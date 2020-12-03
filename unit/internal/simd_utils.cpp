@@ -40,7 +40,7 @@ using namespace ue2;
 namespace {
 
 // Switch one bit on in a bitmask.
-template <class Mask> 
+template <class Mask>
 Mask setbit(unsigned int bit) {
     union {
         Mask simd;
@@ -148,7 +148,7 @@ m256 simd_lshift64(const m256 &a, unsigned i) { return lshift64_m256(a, i); }
 m384 simd_lshift64(const m384 &a, unsigned i) { return lshift64_m384(a, i); }
 m512 simd_lshift64(const m512 &a, unsigned i) { return lshift64_m512(a, i); }
 
-template <typename T> 
+template <typename T>
 class SimdUtilsTest : public testing::Test {
     // empty
 };

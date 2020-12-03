@@ -96,7 +96,7 @@ void cpuid(unsigned int op, unsigned int leaf, unsigned int *eax,
 #define CPUID_XCR0_AVX512                                                      \
     (CPUID_XCR0_OPMASK | CPUID_XCR0_ZMM_Hi256 | CPUID_XCR0_Hi16_ZMM)
 
-#if defined(__x86_64__) 
+#if defined(__x86_64__)
 static inline
 u64a xgetbv(u32 op) {
 #if defined(_WIN32) || defined(__INTEL_COMPILER)
