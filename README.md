@@ -5,7 +5,7 @@ regular expression syntax of the commonly-used libpcre library, but is a
 standalone library with its own C API.
 
 Hyperscan uses hybrid automata techniques to allow simultaneous matching of
-large numbers (up to tens of thousands) of regular expressions and for the
+large numbers (up to tens of thousands) of regular expressions and the
 matching of regular expressions across streams of data.
 
 Hyperscan is typically used in a DPI library stack.
@@ -26,14 +26,14 @@ The `master` branch on Github/kunpengcompute will always contain the most recent
 release of Intel Hyperscan. 
 
 The `aarch64` branch on Github/kunpengcompute will always contain the most recent 
-release that supports the aarch64 architecture. The aarch64 branch was developed
-based on Intel hyperscan 5.2.1. Each version released to `aarch64` branch goes through
-QA and testing before it is released; if you're a user of aarch64, rather than a developer,
+release that supports the AArch64 architecture. The AArch64 branch was developed
+based on Intel Hyperscan 5.2.1. Each version released to `aarch64` branch goes through
+QA and testing before it is released; if you're a user of AArch64, rather than a developer,
 this is the version you should be using.
 
 # Porting
-Perform platform-specific different operations, including compilation options, 
-detection specific header files, SIMD instruction judgment, and so on.
+Perform platform-specific operations, including compilation, 
+detecting specific header files, SIMD instruction judgment, and so on.
 
 # Optimization
 Improve the Kunpeng platform by using the NEON instructions, inline assembly, 
