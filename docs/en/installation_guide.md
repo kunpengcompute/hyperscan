@@ -41,6 +41,64 @@ Before installing and compiling software, obtain the software packages by referr
 |SQLite|SQLite 3|Optional. The compilation of the Hyperscan test tool hsbench depends on SQLite 3.|Use Yum to install it.|
 |Hyperscan|master|Required. Software to be compiled.|[Link](https://gitcode.com/boostkit/hyperscan/tree/master)|
 
+## Deployment Using Container Images
+
+Hyperscan provides a pre-built container image based on openEuler 22.03 LTS SP4. The image contains all dependencies required for compiling Hyperscan (GCC, CMake, Ragel 6.10, Boost 1.87.0, PCRE 8.45 source code, SQLite, etc.). The image can be obtained in either of the following ways:
+
+- Method 1: Pulling the pre-built image from the Huawei Cloud image repository (recommended).
+- Method 2: Building an image from the Dockerfile.
+
+### Method 1: Pulling the Pre-built Image
+
+1. Pull the image.
+
+    ```bash
+    docker pull swr.cn-north-4.myhuaweicloud.com/cloud_boostkit/openeuler22.03_lts_sp4:hyperscan_26.3.0.01
+    ```
+
+2. Create and start a container. In the command, `/path/to/hyperscan` indicates the source code directory on the host. Replace it with the actual path.
+
+    ```bash
+    docker run -itd --name hyperscan -v /path/to/hyperscan:/workspace swr.cn-north-4.myhuaweicloud.com/cloud_boostkit/openeuler22.03_lts_sp4:hyperscan_26.3.0.01
+    ```
+
+3. Enter the container.
+
+    ```bash
+    docker exec -it hyperscan bash
+    ```
+
+### Method 2: Building an Image from the Dockerfile
+
+You can quickly build an image using the Dockerfile. The [Dockerfile](../../Dockerfile) is located in the root directory of the code repository. You can modify the path parameters in the Dockerfile based on actual requirements.
+
+1. Pull the source code.
+
+    ```bash
+    git clone https://gitcode.com/boostkit/hyperscan.git
+    ```
+
+2. Go to the source code directory and build the image.
+
+    ```bash
+    cd hyperscan
+    docker build -t your_image_name:your_image_tag .
+    ```
+
+3. Create and enter the container.
+
+    ```bash
+    docker run -itd --name hyperscan -v /path/to/hyperscan:/workspace your_image_name:your_image_tag
+    docker exec -it hyperscan bash
+    ```
+
+>![](public_sys-resources/icon-note.gif) **Note:**
+>- The following compilation dependencies have been pre-installed in the image: GCC, G++, Make, CMake, Git, Python3-pip, Ragel 6.10, Boost 1.87.0, SQLite and its development libraries, and PCRE 8.45 source code.
+>- The Hyperscan source code is not pre-installed in the image. Use the `-v` parameter to mount the source code directory on the host to the `/workspace` directory of the container.
+>- When the container starts, the entrypoint script automatically copies the PCRE 8.45 source code to the `/workspace/pcre` directory (equivalent to the [Downloading PCRE](#downloading-pcre) section).
+>- If you deploy using container images, you can skip all steps in the [Configuring the Compilation Environment](#configuring-the-compilation-environment) section.
+>- After entering the container, see the [Compiling Hyperscan](#compiling-hyperscan) section to compile the code.
+
 ## Configuring the Compilation Environment<a name="EN-US_TOPIC_0000002550305597"></a>
 
 ### (Optional) Configuring the Local Repository<a name="EN-US_TOPIC_0000002550305595"></a>
