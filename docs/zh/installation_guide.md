@@ -93,6 +93,7 @@ Hyperscan提供基于openEuler 22.03 LTS SP4的预构建容器镜像，镜像内
     ```
 
 >![](public_sys-resources/icon-note.gif) **说明：** 
+>
 >- 镜像内已预装编译依赖：GCC、G++、Make、CMake、Git、Python3-pip、Ragel 6.10、Boost 1.87.0、SQLite及其开发库、PCRE 8.45源码。
 >- 镜像内未预置Hyperscan源码，须通过“-v”参数将宿主机源码目录挂载至容器的“/workspace”目录。
 >- 容器启动时入口脚本会自动将PCRE 8.45源码拷贝到“/workspace/pcre”目录（等价于[下载PCRE](#下载pcre)章节）。

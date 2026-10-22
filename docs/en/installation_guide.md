@@ -93,6 +93,7 @@ You can quickly build an image using the Dockerfile. The [Dockerfile](../../Dock
     ```
 
 >![](public_sys-resources/icon-note.gif) **Note:**
+>
 >- The following compilation dependencies have been pre-installed in the image: GCC, G++, Make, CMake, Git, Python3-pip, Ragel 6.10, Boost 1.87.0, SQLite and its development libraries, and PCRE 8.45 source code.
 >- The Hyperscan source code is not pre-installed in the image. Use the `-v` parameter to mount the source code directory on the host to the `/workspace` directory of the container.
 >- When the container starts, the entrypoint script automatically copies the PCRE 8.45 source code to the `/workspace/pcre` directory (equivalent to the [Downloading PCRE](#downloading-pcre) section).
