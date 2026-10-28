@@ -41,65 +41,6 @@ Hyperscan当前适配的处理器鲲鹏920系列处理器，操作系统为openE
 |SQLite|SQLite 3|可选：Hyperscan tools测试工具hsbench编译依赖SQLite 3。|使用Yum工具安装。|
 |Hyperscan|master|必选：待编译软件。|[获取链接](https://gitcode.com/boostkit/hyperscan/tree/master)|
 
-## 镜像方式部署
-
-Hyperscan提供基于openEuler 22.03 LTS SP4的预构建容器镜像，镜像内已包含编译Hyperscan所需的全部依赖（GCC、CMake、Ragel 6.10、Boost 1.87.0、PCRE 8.45源码、SQLite等）。获取镜像有以下两种方式：
-
-- 方式一：从华为云镜像仓库拉取预构建镜像（推荐）。
-- 方式二：从Dockerfile构建镜像。
-
-### 方式一：拉取预构建镜像
-
-1. 拉取镜像。
-
-    ```bash
-    docker pull swr.cn-north-4.myhuaweicloud.com/cloud_boostkit/openeuler22.03_lts_sp4:hyperscan_26.3.0.01
-    ```
-
-2. 创建并启动容器。其中“/path/to/hyperscan”为宿主机上源码目录，请根据实际路径替换。
-
-    ```bash
-    docker run -itd --name hyperscan -v /path/to/hyperscan:/workspace swr.cn-north-4.myhuaweicloud.com/cloud_boostkit/openeuler22.03_lts_sp4:hyperscan_26.3.0.01
-    ```
-
-3. 进入容器。
-
-    ```bash
-    docker exec -it hyperscan bash
-    ```
-
-### 方式二：从Dockerfile构建镜像
-
-通过Dockerfile可快速构建镜像。[Dockerfile](../../Dockerfile)位于代码仓根目录，用户可根据实际需求修改Dockerfile中的路径参数。
-
-1. 拉取源码。
-
-    ```bash
-    git clone https://gitcode.com/boostkit/hyperscan.git
-    ```
-
-2. 进入源码目录，构建镜像。
-
-    ```bash
-    cd hyperscan
-    docker build -t your_image_name:your_image_tag .
-    ```
-
-3. 创建并进入容器。
-
-    ```bash
-    docker run -itd --name hyperscan -v /path/to/hyperscan:/workspace your_image_name:your_image_tag
-    docker exec -it hyperscan bash
-    ```
-
->![](public_sys-resources/icon-note.gif) **说明：** 
->
->- 镜像内已预装编译依赖：GCC、G++、Make、CMake、Git、Python3-pip、Ragel 6.10、Boost 1.87.0、SQLite及其开发库、PCRE 8.45源码。
->- 镜像内未预置Hyperscan源码，须通过“-v”参数将宿主机源码目录挂载至容器的“/workspace”目录。
->- 容器启动时入口脚本会自动将PCRE 8.45源码拷贝到“/workspace/pcre”目录（等价于[下载PCRE](#下载pcre)章节）。
->- 使用镜像方式部署可跳过[配置编译环境](#配置编译环境)章节的全部步骤。
->- 进入容器后，请参考[编译Hyperscan](#编译hyperscan)章节完成编译。
-
 ## 配置编译环境
 
 ### （可选）配置本地源
