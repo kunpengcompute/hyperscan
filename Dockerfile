@@ -1,3 +1,11 @@
+# ── 使用说明 ────────────────────────────────────────────────────
+# 本文件用于构建 hyperscan 编译环境镜像, 提供两种方式:
+#   方式一: 直接用本 Dockerfile 构建镜像
+#           docker build -t hyperscan_26.3.0.01 .
+#   方式二: 直接拉取基于本 Dockerfile 已构建好的镜像(免去本地构建耗时)
+#           docker pull swr.cn-north-4.myhuaweicloud.com/cloud_boostkit/openeuler22.03_lts_sp4:hyperscan_26.3.0.01
+# 两种方式得到的镜像内容一致, 可任选其一使用。
+# ────────────────────────────────────────────────────────────────
 FROM swr.cn-north-4.myhuaweicloud.com/cloud_boostkit/openeuler-22.03-lts-sp4:latest
 
 # ── 第一层: 系统工具链 + 构建依赖 (dnf) ──────────────────────────
