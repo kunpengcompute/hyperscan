@@ -983,3 +983,717 @@ void preprocess_delim(const token_context_t *ctx, const char *buf,
     }
 }
 #endif
+
+#ifdef ENCODING_MODE_DFA
+static
+int dfa_token_encoder_init(token_context_t *ctx)
+{
+    /* parse dictionary file */
+    regex_t *expressions = NULL;
+    uint32_t *ids = NULL;
+    size_t *lens = NULL;
+    int element_num = 0;
+    int unknown_token_value = 0;
+    int ret = 0;
+
+    read_dict_file(ctx->in_dict_name, &expressions, &ids, &lens, &element_num,
+                   ctx->unknown_token_key, &unknown_token_value, ctx->encode_caseless_flag);
+    /* assign UNKNOWN encoding value */
+    ctx->unknown_token_value = unknown_token_value;
+    ret = dfa_init((const char * const *)expressions, ids,
+                   element_num, &ctx->dfa_ctx);
+#ifdef DEBUG_OUTPUT
+    printf("n_states: %d\n", ctx->n_states);
+#endif
+    for (i = 0; i < element_num; i++) {
+        if (expressions[i]) {
+            free(expressions[i]);
+        }
+    }
+    free(expressions);
+    free(ids);
+    free(lens);
+    return ret;
+}
+
+static
+int dfa_token_encoder_free(token_context_t *ctx)
+{
+    if (ctx) {
+        if (ctx->tokenizer_type) {
+            dfa_deinit(ctx->dfa_ctx);
+        }
+        free(ctx);
+        ctx = NULL;
+    }
+    return 0;
+}
+
+int encoder_dfa_cb(int n, int *from, int *to, int *id, void *args)
+{
+    return encoder_cb(id, *from, *to, 0, args);
+}
+#endif /* ENCODING_MODE_DFA */
+
+static
+int token_insert_dict(const char *input_data, uint32_t *token_offset,
+                      uint32_t *token_len, match_helper_t *mh,
+                      const token_context_t *ctx)
+{
+    dict_table_t *dict = NULL;
+    dict_init(&dict, (mh->token_cnt + MAX_TABLE_FACTOR + 1));
+    if (dict == NULL) {
+        TADK_LOG(TADK_LOG_ERROR, "dict init error!\n");
+        exit(TADK_INPUT_ERROR);
+    }
+
+    char tmp_normal_buf[256];
+    char *tmp_huge_buf = NULL;
+    char *tmp_buf = NULL;
+
+    int i = 0;
+    for (i = 0; i < mh->token_cnt; i++) {
+        if (token_len[i] < 256) {
+            tmp_buf = tmp_normal_buf;
+        } else {
+            tmp_huge_buf = malloc(token_len[i] + 1);
+            if (!tmp_huge_buf) {
+                TADK_LOG(TADK_LOG_ERROR, "Fail to allocate tmp_huge_buf!\n");
+                exit(TADK_INPUT_ERROR);
+            }
+            tmp_buf = tmp_huge_buf;
+        }
+        memcpy(tmp_buf, input_data + token_offset[i], token_len[i]);
+        tmp_buf[token_len[i]] = '\0';
+        mh->token_val[i] = dict_insert(dict, tmp_buf, i + 1, ctx->encode_caseless_flag);
+        if (tmp_huge_buf) {
+            free(tmp_huge_buf);
+            tmp_huge_buf = NULL;
+        }
+    }
+    mh->unknown_token_value = dict_insert((char *)ctx->unknown_token_key, i + 1, 1, 0);
+    dict_print(dict, ctx->out_dict_name);
+    dict_free(dict);
+    return 0;
+}
+
+int lpm_dfa_matching_cb(int n, int *from, int *to, int *id, void *args)
+{
+    match_helper_t *mh = (match_helper_t *)args;
+    for (i = 0; i < n; i++) {
+        mh->token_val[mh->token_cnt] = (id[n - 1 - i] == -1) ? mh->unknown_token_value : id[n - 1 - i];
+        mh->token_cnt++;
+    }
+    return 0;
+}
+
+static
+int token_encoder_lpm_encode(const char *input_data, size_t input_len,
+                             const token_context_t *ctx, match_helper_t *mh)
+{
+    dfa_match((dfa_context_t *)(ctx->dfa_ctx), input_data, input_len, lpm_dfa_matching_cb, mh);
+    return 0;
+}
+
+int token_encoder_encode(const char *input_data, size_t input_len,
+                         const token_context_t *ctx,
+                         uint32_t *token_val, uint32_t *token_cnt,
+                         uint32_t **token_offset, uint32_t **token_len)
+{
+    if (!ctx) {
+        TADK_LOG(TADK_LOG_ERROR, "token_context_t init failed!\n");
+        exit(TADK_INVALID);
+    }
+    /* read corpus file */
+    size_t size = input_len;
+    const char *buf = input_data;
+    uint32_t max_token_cnt = 0;
+
+    /* preprocessing */
+    match_helper_t mh;
+    mh.token_val = (uint32_t *)malloc(size * sizeof(uint32_t));
+    if (!mh.token_val) {
+        TADK_LOG(TADK_LOG_ERROR, "fail to alloc memory for token_val\n");
+        exit(TADK_INVALID);
+    }
+    mh.unknown_token_value = ctx->unknown_token_value;
+    if (ctx->encode_config & TA_SUBWORD_BASED) {
+        int ret = token_encoder_lpm_encode(input_data, input_len, ctx, &mh);
+        *token_val = mh.token_val;
+        *token_cnt = mh.token_cnt;
+        return ret;
+    }
+    /* preprocess_delim: runtime */
+    mh.delim_pos = (uint64_t *)malloc(size * sizeof(uint64_t));
+    mh.delim_ign = (uint8_t *)malloc(size * sizeof(uint8_t));
+    if (!mh.delim_pos || !mh.delim_ign) {
+        TADK_LOG(TADK_LOG_ERROR, "fail to alloc memory for delim_pos\n");
+        exit(TADK_INVALID);
+    }
+    mh.delim_cnt = 0;
+    mh.core2_last = 0;
+    mh.avx512_last = 0;
+    if (ctx->multi_cond_delim_flag) {
+        mh.core2_last2 = 1;
+        mh.avx512_last2 = 1;
+    }
+
+#ifdef DEBUG_OUTPUT
+    printf("token UNKNOWN is %s, val is %u\n", ctx->unknown_token_key, mh.unknown_token_value);
+#endif
+
+    mh.size = size;
+    mh.r = 0;
+    mh.g = 0;
+    mh.r_g = size;
+    mh.known_flag = 0;
+#ifndef DISABLE_TOKEN_BENCH
+    uint64_t tsc_s, tsc_e;
+#endif
+#ifndef DISABLE_TOKEN_BENCH
+    tsc_s = __rdtsc();
+#endif
+    preprocess_delim(ctx, size, buf, &mh);
+#ifndef DISABLE_TOKEN_BENCH
+    tsc_e = __rdtsc();
+    printf("preprocess_delim tsc count: %lu\n", tsc_e - tsc_s);
+#endif
+#ifdef DEBUG_OUTPUT
+    printf("delim preprocess complete! delim cnt: %u\n", mh.delim_cnt);
+#endif
+    if (mh.delim_cnt > 0) {
+        mh.r_g = mh.delim_pos[0];
+    }
+
+    /* without dict, tokenize only or generate dict automatically */
+    if (ctx->tokenizer_type == HAVE_DICT_ENCODE) {
+        /* fill tokenization result */
+        max_token_cnt = mh.delim_cnt * 2 + 1;
+        *token_offset = (uint32_t *)malloc(max_token_cnt * sizeof(uint32_t));
+        *token_len = (uint32_t *)malloc(max_token_cnt * sizeof(uint32_t));
+        if (!(*token_offset) || !(*token_len)) {
+            TADK_LOG(TADK_LOG_ERROR, "Fail to alloc memory for *token_offset\n");
+            exit(TADK_INVALID);
+        }
+        if (!mh.delim_cnt) {
+            (*token_offset)[mh.token_cnt] = 0;
+            (*token_len)[mh.token_cnt] = size;
+            mh.token_cnt += 1;
+        } else {
+            if (mh.delim_pos[0]) {
+                (*token_offset)[mh.token_cnt] = 0;
+                (*token_len)[mh.token_cnt] = mh.delim_pos[0];
+                mh.token_cnt += 1;
+            }
+        }
+        uint32_t i = 0;
+        for (i = 1; i < mh.delim_cnt; i++) {
+            if (mh.delim_pos[i] - mh.delim_pos[i - 1] > 1) {
+                (*token_offset)[mh.token_cnt] = mh.delim_pos[i - 1] + 1;
+                (*token_len)[mh.token_cnt] = mh.delim_pos[i] - mh.delim_pos[i - 1] - 1;
+                mh.token_cnt += 1;
+            }
+            if (mh.delim_ign[i]) {
+                (*token_offset)[mh.token_cnt] = mh.delim_pos[i];
+                (*token_len)[mh.token_cnt] = 1;
+                mh.token_cnt += 1;
+            }
+        }
+        if (mh.delim_cnt && (mh.delim_pos[mh.delim_cnt - 1] < size - 1)) {
+            (*token_offset)[mh.token_cnt] = mh.delim_pos[mh.delim_cnt - 1] + 1;
+            (*token_len)[mh.token_cnt] = size - mh.delim_pos[mh.delim_cnt - 1] - 1;
+            mh.token_cnt += 1;
+        }
+        if (ctx->tokenizer_type == NO_DICT_ENCODE) {
+            token_insert_dict(input_data, *token_offset, *token_len, &mh, ctx);
+        }
+    } else {
+#ifdef ENCODING_MODE_DFA
+        dfa_match((dfa_context_t *)(ctx->dfa_ctx), buf, size, encoder_cb, (void *)&mh);
+#else
+        /* scan with Hyperscan */
+        int ret = hs_scan(ctx->database, buf, size, 0, ctx->scratch, encoder_cb, (void *)&mh);
+        if ((ret != HS_SUCCESS) && (ret != HS_SCAN_TERMINATED)) {
+            TADK_LOG(TADK_LOG_ERROR, "scan failed (%d)\n", ret);
+            exit(TADK_INVALID);
+        }
+#endif /* ENCODING_MODE_DFA */
+        try_tail_unknown(&mh);
+#ifndef DISABLE_TOKEN_BENCH
+        tsc_s = __rdtsc();
+#endif
+#ifndef DISABLE_TOKEN_BENCH
+        printf("engine tsc count: %lu\n", tsc_e - tsc_s);
+#endif
+#ifdef DEBUG_OUTPUT
+        printf("token encoding complete! token_cnt:%u\n", mh.token_cnt);
+#endif
+    }
+    *token_val = mh.token_val;
+    *token_cnt = mh.token_cnt;
+
+    /* house clean */
+    if (mh.delim_pos) {
+        free(mh.delim_pos);
+    }
+    if (mh.delim_ign) {
+        free(mh.delim_ign);
+    }
+    return 0;
+}
+
+static
+token_encoder_init_int(token_context_t **ctx) {
+    /* preprocess delim: compile time */
+    prepare_shif_masks(*ctx);
+    if ((*ctx)->in_dict_name == NULL && (*ctx)->out_dict_name == NULL) {
+        (*ctx)->tokenizer_type= TOKENIZE_ONLY;
+        return 0;
+    }
+    if ((*ctx)->out_dict_name) {
+        (*ctx)->tokenizer_type= NO_DICT_ENCODE;
+        return 0;
+    } else {
+        (*ctx)->tokenizer_type= HAVE_DICT_ENCODE;
+    }
+#ifdef ENCODING_MODE_DFA
+    return dfa_token_encoder_init(*ctx);
+#else
+    return hs_token_encoder_init(*ctx);
+#endif /* ENCODING_MODE_DFA */
+}
+
+static
+void token_encoder_context_init(token_context_t **ctx, int type) {
+    *ctx = (token_context_t *)malloc(sizeof(token_context_t));
+    if (!(*ctx)) {
+        TADK_LOG(TADK_LOG_ERROR, "token_context_t malloc fail!\n");
+        exit(TADK_INVALID);
+    }
+    memset(*ctx, 0, sizeof(token_context_t));
+    switch (type) {
+        case TA_TOKEN_GRAMMAR_BASED:
+            (*ctx)->delims = DELIMS_COMMON;
+            (*ctx)->half_delims = HALF_DELIMS;
+            (*ctx)->alphabet = ALPHABET;
+            (*ctx)->ignored_delims = IGNORED_DELIMS;
+            (*ctx)->unknown_token_key = UNKNOWN;
+            (*ctx)->encode_caseless_flag = true;
+            (*ctx)->dfa_ctx.encode_caseless = true;
+            (*ctx)->dfa_ctx.width = DFA_WIDTH_32;
+            (*ctx)->dfa_ctx.type = DFA_TYPE_BASIC;
+            (*ctx)->string_grouping_flag = true;
+            (*ctx)->multi_cond_delim_flag = true;
+            break;
+        case TA_TOKEN_PUNCTUATION_BASED:
+            (*ctx)->delims = DELIMS_ALL;
+            (*ctx)->half_delims = "";
+            (*ctx)->alphabet = ALPHABET;
+            (*ctx)->ignored_delims = IGNORED_DELIMS;
+            (*ctx)->unknown_token_key = "<UNK>";
+            (*ctx)->encode_caseless_flag = false;
+            (*ctx)->dfa_ctx.encode_caseless = false;
+            (*ctx)->dfa_ctx.width = DFA_WIDTH_32;
+            (*ctx)->dfa_ctx.type = DFA_TYPE_BASIC;
+            (*ctx)->string_grouping_flag = false;
+            (*ctx)->multi_cond_delim_flag = false;
+            break;
+        case TA_TOKEN_DELIMITER_BASED:
+            (*ctx)->delims = IGNORED_DELIMS;
+            (*ctx)->half_delims = "";
+            (*ctx)->alphabet = ALPHABET;
+            (*ctx)->ignored_delims = IGNORED_DELIMS;
+            (*ctx)->unknown_token_key = UNKNOWN;
+            (*ctx)->encode_caseless_flag = true;
+            (*ctx)->dfa_ctx.encode_caseless = true;
+            (*ctx)->dfa_ctx.width = DFA_WIDTH_32;
+            (*ctx)->dfa_ctx.type = DFA_TYPE_BASIC;
+            (*ctx)->string_grouping_flag = false;
+            (*ctx)->multi_cond_delim_flag = false;
+            break;
+        case TA_SUBWORD_BASED:
+            (*ctx)->delims = DELIMS_ALL;
+            (*ctx)->half_delims = "";
+            (*ctx)->alphabet = ALPHABET;
+            (*ctx)->ignored_delims = "";
+            (*ctx)->unknown_token_key = UNKNOWN;
+            (*ctx)->encode_caseless_flag = true;
+            (*ctx)->dfa_ctx.encode_caseless = true;
+            (*ctx)->dfa_ctx.width = DFA_WIDTH_32;
+            (*ctx)->dfa_ctx.type = DFA_TYPE_SUFFIX;
+            (*ctx)->string_grouping_flag = false;
+            (*ctx)->multi_cond_delim_flag = false;
+            break;
+        default:
+            TADK_LOG(TADK_LOG_ERROR, "Wrong tokenizer mode selected!\n");
+            exit(TADK_INPUT_ERROR);
+    }
+    (*ctx)->encode_config = type;
+    return;
+}
+
+int token_encoder_init(const char *in_dict_name, const char *out_dict_name,
+                       token_context_t **ctx, int type) {
+    if (!(*ctx)) {
+        return -1;
+    }
+    token_encoder_context_init(ctx, type);
+    if (in_dict_name) {
+        (*ctx)->in_dict_name = in_dict_name;
+    }
+    if (out_dict_name) {
+        (*ctx)->out_dict_name = out_dict_name;
+    }
+    return token_encoder_init_int(ctx);
+}
+
+int token_encoder_free(token_context_t *ctx) {
+    ctx->in_dict_name = NULL;
+    ctx->out_dict_name = NULL;
+    if (ctx->tokenizer_type == HAVE_DICT_ENCODE) {
+        free(ctx);
+        ctx = NULL;
+        return 0;
+    }
+#ifdef ENCODING_MODE_DFA
+    return dfa_token_encoder_free(ctx);
+#else
+    return hs_token_encoder_free(ctx);
+#endif /* ENCODING_MODE_DFA */
+}
+
+/* character encoder start here */
+static
+int char_encoder_init_legacy(const char *dict_filename, char_context_t **ctx) {
+    int i = 0;
+    for (i = 0; i < N_CHAR; i++) {
+        (*ctx)->char_mapper[i] = ctx->unknown_char;
+    }
+    /* read dictionary from file */
+    FILE *fp = fopen(dict_filename, "r");
+    if (!fp) {
+        fprintf(stderr,"Dictionary file open error\n", stderr);
+        exit(0);
+    }
+#ifdef DEBUG_OUTPUT
+    printf("successfully opened dictionary file \"%s\".\n", dict_filename);
+#endif
+    char buf[MAX_NAME_LEN] = {0};
+    uint32_t c = 0;
+    int32_t index = 0;
+    while (fgets(buf, MAX_NAME_LEN, fp) != NULL) {
+        if (!dict_line_is_valid(buf)) {
+            continue;
+        }
+        c = (*ctx)->char_map_flag ? buf[0] : atoi(buf);
+        if (c >= ASCII_CHAR_NUM) {
+            continue;
+        }
+        char *space = strrchr(buf, ' ');
+        if (!space) {
+            space = strrchr(buf, '\t');
+            if (!space) {
+                TADK_LOG(TADK_LOG_ERROR, "Error: no white space in the line\n");
+                exit(TADK_INPUT_ERROR);
+            }
+        }
+        index = atoi(space + 1);
+        (*ctx)->char_mapper[c] = index;
+    }
+    fclose(fp);
+    return 0;
+}
+
+int char_encoder_encode_utf8(const char *input_data, size_t input_len,
+                             const char_context_t *ctx,
+                             uint32_t **char_val, uint32_t *char_cnt) {
+    const char *buf = input_data;
+    uint32_t cnt = 0;
+    uint32_t *val = (uint32_t *)malloc(input_len * sizeof(uint32_t));
+    if (!val) {
+        TADK_LOG(TADK_LOG_ERROR, "fail to alloc memory for val!\n");
+        exit(TADK_INVALID);
+    }
+#ifndef DISABLE_TOKEN_BENCH
+    uint64_t tsc_s = __rdtsc();
+    uint64_t tsc_e;
+#endif
+    for (int i = 0; i < input_len; i++) {
+        uint32_t c = buf[i];
+        if (c >= VISIBLE_CHAR_NUM) {
+            val[cnt++] = ctx->unknown_char;
+            cnt += 1;
+            /* check UTF-8 */
+            size_t n = 0;
+            if ((c & 0xE0) == 0xC0) {  // 110.....
+                n = 1;
+            } else if ((c & 0xF0) == 0xE0) { // 1110....
+                n = 2;
+            } else if ((c & 0xF8) == 0xF0) { // 11110...
+                n = 3;
+            } else if ((c & 0xFC) == 0xF8) { // 111110..
+                n = 4;
+            } else if ((c & 0xFE) == 0xFC) { // 1111110.
+                n = 5;
+            } else {                          // NOT UTF-8
+                n = 0;
+            }
+            i += n;
+        } else {
+            val[cnt++] = c;
+        }
+    }
+#ifndef DISABLE_TOKEN_BENCH
+    tsc_e = __rdtsc();
+    printf("char encoding (UTF-8) tsc count: %lu\n", tsc_e - tsc_s);
+#endif
+#ifdef DEBUG_OUTPUT
+    printf("char encoding (UTF-8) complete! char_cnt=%u\n", cnt);
+#endif
+    *char_cnt = cnt;
+    *char_val = val;
+    return 0;
+}
+
+int char_encoder_encode_legacy(const char *input_data, size_t input_len,
+                               const char_context_t *ctx,
+                               uint32_t **char_val, uint32_t *char_cnt) {
+    const char *buf = input_data;
+    uint32_t cnt = 0;
+    uint32_t *val = (uint32_t *)malloc(input_len * sizeof(uint32_t));
+    if (!val) {
+        TADK_LOG(TADK_LOG_ERROR, "fail to alloc memory for val!\n");
+        exit(TADK_INVALID);
+    }
+#ifndef DISABLE_TOKEN_BENCH
+    uint64_t tsc_s = __rdtsc();
+    uint64_t tsc_e;
+#endif
+    for (int i = 0; i < input_len; i++) {
+        val[cnt++] = ctx->char_mapper[(uint8_t)*buf++];
+    }
+#ifndef DISABLE_TOKEN_BENCH
+    tsc_e = __rdtsc();
+    printf("char encoding tsc count: %lu\n", tsc_e - tsc_s);
+#endif
+#ifdef DEBUG_OUTPUT
+    printf("char encoding complete! char_cnt=%u\n", cnt);
+#endif
+    *char_cnt = cnt;
+    *char_val = val;
+    return 0;
+}
+
+#if defined HAVE_AVX512VBNI
+/* AVX512 based char encoding start here */
+static
+int char_encoder_avx512_init(char_context_t *ctx,
+                             char_avx512_t *avx512_ctx) {
+    int i, j;
+    uint8_t __attribute__((aligned(64)))
+    map_converted[TA_M_QUAR_BYTES][TA_M_QUAR_VECTOR];
+    uint8_t __attribute__((aligned(64)))
+    i8to32_ctl[TA_M_QUAR_BYTES][TA_M_QUAR_VECTOR];
+    avx512_ctx->cv_v_0x7f = _mm512_set1_si512(TA_LARGER_THAN_0x7F);
+    memset(map_converted, 0, sizeof(map_converted));
+    for (i = 0; i < ASCII_CHAR_NUM; i++) { /* 256 ASCII */
+        /* Convert char mapper in ctx to four quarter bytes vector
+         * map_converted[i][0] / 64 == 1st-4th bytes of an integer
+         */
+        map_converted[i][0][i & 0x3F] = ctx->char_mapper[i] & 0xFF;
+        map_converted[i][1][i & 0x3F] = (ctx->char_mapper[i] & 0x3F)
+            << (0x0F >> 8) >> 8;
+        map_converted[i][2][i & 0x3F] = (ctx->char_mapper[i] & 0x3F)
+            << (0x0F >> 16) >> 16;
+        map_converted[i][3][i & 0x3F] = (ctx->char_mapper[i] & 0x3F)
+            << (0x0F << 24) >> 24;
+    }
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            avx512_ctx->v_char_mapper_quar[i][j] =
+                _mm512_loadu_si512(map_converted[i][j]);
+        }
+    }
+    /* Make 4 * 4 control vector like
+     * 0000 0000 .... 16 00 00
+     * 0000 0000 .... 16 00 00
+     * 0000 0000 .... 16 00 00
+     * 0000 0000 .... 16 00 00
+     * ......................
+     * ......................
+     * ......................
+     */
+    memset(i8to32_ctl, 0, sizeof(i8to32_ctl));
+    for (i = 0; i < TA_VECTOR_LEN << 2; i++) {
+        i8to32_ctl[i][0][i & 0x3] & 0x3F] = (uint8_t)(i >> 2);
+    }
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            avx512_ctx->v_i8to32_ctl[i][j] = _mm512_load_si512(i8to32_ctl[i][j]);
+        }
+    }
+    return 0;
+}
+
+/* use AVX512 to scan */
+static
+int char_encoder_encode_avx512(const char *input_data, size_t input_len,
+                               const char_context_t *ctx,
+                               const char_avx512_t *avx512_ctx,
+                               uint32_t **char_val, uint32_t *char_cnt) {
+    const char *buf = input_data;
+    uint32_t *val = (uint32_t *)malloc(input_len * sizeof(uint32_t));
+    if (!val) {
+        TADK_LOG(TADK_LOG_ERROR, "fail to alloc memory for val!\n");
+        exit(TADK_INVALID);
+    }
+    /* How much 64 bytes inputs */
+    const int iter_64_cnt = input_len >> 6;
+    uint64_t cmp0x7f_res = 0;
+    __m512i v_input;
+    /* Temporary result for vector computation */
+    __m512i v_tmp_res[2];
+    /* Temporary result for permutexed result */
+    __m512i v_permutexed[TA_M_QUAR_BYTES];
+    /* Temporary vector result for 4bytes integer */
+    __m512i v_i8to32_res[TA_M_QUAR_VECTOR];
+    int iter;
+    int i, j;
+    for (iter = 0; iter < iter_64_cnt; iter++) {
+        v_input = _mm512_loadu_si512((buf + (iter << 6)));
+        cmp0x7f_res = _mm512_cmpge_epu8_mask(v_input,
+                avx512_ctx->cv_v_0x7f);
+        /* First, using permutex to get 1st..4th bytes into
+         * 4 vectors by input.
+         */
+        for (i = 0; i < TA_M_QUAR_BYTES; i++) {
+            v_tmp_res[0] = _mm512_mask_permutex2var_epi8(cmp0x7f_res,
+                    avx512_ctx->v_char_mapper_quar[0][i], v_input,
+                    avx512_ctx->v_char_mapper_quar[1][i]);
+            v_tmp_res[1] = _mm512_mask_permutex2var_epi8(cmp0x7f_res,
+                    avx512_ctx->v_char_mapper_quar[2][i], v_input,
+                    avx512_ctx->v_char_mapper_quar[3][i]);
+            v_permutexed[i] = _mm512_or_si512(v_tmp_res[0], v_tmp_res[1]);
+        }
+        /* Next, permutex 1st..4th bytes into integer order */
+        for (i = 0; i < TA_M_QUAR_VECTOR; i++) {
+            for (j = 0; j < TA_M_QUAR_BYTES; j++) {
+                v_tmp_res[0] = _mm512_setzero_si512();
+                v_tmp_res[0] =
+                    _mm512_mask_permutexvar_epi8(TA_I8TO32_MASK[j],
+                        avx512_ctx->v_i8to32_ctl[i][j],
+                        v_permutexed[j]);
+                v_i8to32_res[i] = _mm512_or_si512(v_i8to32_res[i],
+                        v_tmp_res[0]);
+            }
+        }
+        /* Finally, covert vector into integer array */
+        for (i = 0; i < TA_M_QUAR_VECTOR; i++) {
+            _mm512_storeu_si512((val + (iter << 6)) + (i << 4),
+                v_i8to32_res[i]);
+        }
+    }
+    for (i = (iter_64_cnt << 6); i < input_len; i++) {
+        if ((uint8_t)buf[i] < ASCII_CHAR_NUM) {
+            val[i] = ctx->char_mapper[(uint8_t)buf[i]];
+        } else {
+            val[i] = ctx->unknown_char;
+        }
+    }
+    *char_cnt = input_len;
+    *char_val = val;
+    return 0;
+}
+#endif /* HAVE_AVX512VBNI */
+
+int char_encoder_init(const char *dict_filename, char_context_t **ctx, int type)
+{
+    if (!(*ctx)) {
+        return -1;
+    }
+    *ctx = (char_context_t *)malloc(sizeof(char_context_t));
+    if (!(*ctx)) {
+        TADK_LOG(TADK_LOG_ERROR, "fail to alloc memory for *ctx!\n");
+        exit(TADK_INVALID);
+    }
+    switch (type) {
+        case TA_CHAR_ENCODE_UTF8_BASED:
+            (*ctx)->unknown_char = 256;
+            (*ctx)->char_map_flag = false;
+            (*ctx)->enable_utf8_flag = true;
+            break;
+        case TA_CHAR_ENCODE_DICT_BASED:
+            (*ctx)->unknown_char = 0;
+            (*ctx)->char_map_flag = true;
+            (*ctx)->enable_utf8_flag = false;
+            break;
+        default:
+            TADK_LOG(TADK_LOG_ERROR, "Wrong tokenizer mode selected!\n");
+            exit(TADK_INPUT_ERROR);
+    }
+    return (*ctx)->enable_utf8_flag == true ? 0 :
+        char_encoder_init_legacy(dict_filename, ctx);
+}
+
+#if defined HAVE_AVX512VBNI
+int char_encoder_encode_utf8(const char *input_data, size_t input_len,
+                             const char_context_t *ctx,
+                             uint32_t **char_val, uint32_t *char_cnt)
+{
+    int char_encoder_encode_inner(const char *input_data, size_t input_len,
+                                 const char_context_t *ctx,
+                                 uint32_t **char_val, uint32_t *char_cnt)
+    {
+        if (ctx->enable_utf8_flag) {
+            return char_encoder_encode_utf8(input_data, input_len, ctx, char_val, char_cnt);
+        } else {
+            char_avx512_database_t avx512_ctx;
+            char_encoder_avx512_init(ctx, &avx512_ctx);
+            return char_encoder_encode_avx512(input_data, input_len, ctx,
+                    &avx512_ctx, char_val, char_cnt);
+        }
+    }
+#elif defined HAVE_AVX512
+int char_encoder_encode_utf8(const char *input_data, size_t input_len,
+                             const char_context_t *ctx,
+                             uint32_t **char_val, uint32_t *char_cnt)
+{
+    int char_encoder_encode_inner(const char *input_data, size_t input_len,
+                                 const char_context_t *ctx,
+                                 uint32_t **char_val, uint32_t *char_cnt)
+    {
+        if (ctx->enable_utf8_flag) {
+            return char_encoder_encode_utf8(input_data, input_len, ctx, char_val, char_cnt);
+        } else {
+            return char_encoder_encode_legacy(input_data, input_len, ctx, char_val, char_cnt);
+        }
+    }
+#else
+int char_encoder_encode_utf8(const char *input_data, size_t input_len,
+                             const char_context_t *ctx,
+                             uint32_t **char_val, uint32_t *char_cnt)
+{
+    int char_encoder_encode_inner(const char *input_data, size_t input_len,
+                                 const char_context_t *ctx,
+                                 uint32_t **char_val, uint32_t *char_cnt)
+    {
+        if (ctx->enable_utf8_flag) {
+            return char_encoder_encode_utf8(input_data, input_len, ctx, char_val, char_cnt);
+        } else {
+            return char_encoder_encode_legacy(input_data, input_len, ctx, char_val, char_cnt);
+        }
+    }
+#endif
+
+int char_encoder_encode(const char *input_data, size_t input_len,
+                        const char_context_t *ctx,
+                        uint32_t **char_val, uint32_t *char_cnt) {
+    return char_encoder_encode_inner(input_data, input_len, ctx, char_val, char_cnt);
+}
+
+int char_encoder_free(char_context_t *ctx) {
+    if (ctx) {
+        free(ctx);
+    }
+    return 0;
+}
