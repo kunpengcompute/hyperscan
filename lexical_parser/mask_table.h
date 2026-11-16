@@ -1,0 +1,76 @@
+#ifndef MASK_TABLE_H
+#define MASK_TABLE_H
+
+#include <immintrin.h>
+#include <x86intrin.h>
+#include "lexical_parser_common.h"
+
+#define MASK_NUM        (7)
+
+typedef struct mask512 {
+    __m512i mask_0;
+    __m512i mask_h0;
+    __m512i mask_11;
+    __m512i mask_k1;
+    __m512i mask_k2;
+    __m512i mask_k3;
+} mask512_t;
+
+mask512_t mask512[MASK_NUM] = {
+    {
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+        {0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe, 0xfefefefefefefefe},
+    },
+    {
+        {0xfffffffdff7fffff, 0xaafffffff7fdf, 0xaafffffff7fdf, 0xaafffffff7fdf, 0xaafffffff7fdf, 0xaafffffff7fdf, 0xaafffffff7fdf, 0xaafffffff7fdf},
+        {0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff},
+        {0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff, 0xd13eef7fbdfbdff},
+        {0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff, 0x3dc2bf7fbdfbdff},
+        {0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff},
+        {0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff, 0xfffef7ffbfdfffff},
+        {0x3ac5ffff, 0x3ac5ffff, 0x3ac5ffff, 0x3ac5ffff, 0x3ac5ffff, 0x3ac5ffff, 0x3ac5ffff, 0x3ac5ffff},
+    },
+    {
+        {0xfffff3fffd7fffff, 0xfffff3fffd7fffff, 0xfffff3fffd7fffff, 0xfffff3fffd7fffff, 0xfffff3fffd7fffff, 0xfffff3fffd7fffff, 0xfffff3fffd7fffff, 0xfffff3fffd7fffff},
+        {0xdd36fffffbdf, 0xdd36fffffbdf, 0xdd36fffffbdf, 0xdd36fffffbdf, 0xdd36fffffbdf, 0xdd36fffffbdf, 0xdd36fffffbdf, 0xdd36fffffbdf},
+        {0x5db6f67f9fffff, 0x5db6f67f9fffff, 0x5db6f67f9fffff, 0x5db6f67f9fffff, 0x5db6f67f9fffff, 0x5db6f67f9fffff, 0x5db6f67f9fffff, 0x5db6f67f9fffff},
+        {0xbdffbdf7fffffe, 0xbdffbdf7fffffe, 0xbdffbdf7fffffe, 0xbdffbdf7fffffe, 0xbdffbdf7fffffe, 0xbdffbdf7fffffe, 0xbdffbdf7fffffe, 0xbdffbdf7fffffe},
+        {0xbe55ffff, 0xbe55ffff, 0xbe55ffff, 0xbe55ffff, 0xbe55ffff, 0xbe55ffff, 0xbe55ffff, 0xbe55ffff},
+    },
+    {
+        {0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff},
+        {0xdfdfffff, 0xdfdfffff, 0xdfdfffff, 0xdfdfffff, 0xdfdfffff, 0xdfdfffff, 0xdfdfffff, 0xdfdfffff},
+        {0xdf74fffffbdf, 0xdf74fffffbdf, 0xdf74fffffbdf, 0xdf74fffffbdf, 0xdf74fffffbdf, 0xdf74fffffbdf, 0xdf74fffffbdf, 0xdf74fffffbdf},
+        {0x5f74fffffbdf, 0x5f74fffffbdf, 0x5f74fffffbdf, 0x5f74fffffbdf, 0x5f74fffffbdf, 0x5f74fffffbdf, 0x5f74fffffbdf, 0x5f74fffffbdf},
+        {0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff},
+        {0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff, 0x0f5fffff},
+    },
+    {
+        {0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff},
+        {0x8df5ffff, 0x8df5ffff, 0x8df5ffff, 0x8df5ffff, 0x8df5ffff, 0x8df5ffff, 0x8df5ffff, 0x8df5ffff},
+        {0x6d670fffffbdf, 0x6d670fffffbdf, 0x6d670fffffbdf, 0x6d670fffffbdf, 0x6d670fffffbdf, 0x6d670fffffbdf, 0x6d670fffffbdf, 0x6d670fffffbdf},
+        {0x5fde5fffffbdf, 0x5fde5fffffbdf, 0x5fde5fffffbdf, 0x5fde5fffffbdf, 0x5fde5fffffbdf, 0x5fde5fffffbdf, 0x5fde5fffffbdf, 0x5fde5fffffbdf},
+        {0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf},
+        {0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf, 0x8fdf6fffffbdf},
+    },
+    {
+        {0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff},
+        {0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf},
+        {0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf},
+        {0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf},
+        {0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf},
+        {0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf, 0x8fddfffffbdf},
+    },
+    {
+        {0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff, 0xfffffff7fffd7fffff},
+        {0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf, 0xdfddfffffbdf},
+        {0xdddf, 0xdddf, 0xdddf, 0xdddf, 0xdddf, 0xdddf, 0xdddf, 0xdddf},
+    }
+};
+
+#endif /* MASK_TABLE_H */
