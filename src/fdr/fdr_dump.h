@@ -36,12 +36,17 @@
 #if defined(DUMP_SUPPORT)
 
 #include <cstdio>
+#include <cstddef>
 
 struct FDR;
 
 namespace ue2 {
 
 void fdrPrintStats(const struct FDR *fdr, FILE *f);
+
+// Optional diagnostic; not called by fdrPrintStats or the existing dump path.
+// bytecode_size must be the actual readable size of this FDR/Teddy allocation.
+bool dumpConfirmChains(const struct FDR *fdr, size_t bytecode_size, FILE *f);
 
 } // namespace ue2
 
