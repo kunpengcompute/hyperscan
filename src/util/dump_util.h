@@ -32,10 +32,51 @@
 #include "noncopyable.h"
 
 #include <cstdio>
+#include <cstddef>
+#include <cstring>
 #include <memory>
 #include <string>
 
 namespace ue2 {
+
+#ifdef DUMP_SUPPORT
+/** Bounds-checked, unaligned reads for the optional bytecode diagnostics. */
+class DumpBuffer {
+public:
+    DumpBuffer(const void *data_in, size_t size_in)
+        : data(static_cast<const unsigned char *>(data_in)), length(size_in) {}
+
+    size_t size() const { return length; }
+
+    bool contains(size_t offset, size_t bytes) const {
+        return data && offset <= length && bytes <= length - offset;
+    }
+
+    bool containsArray(size_t offset, size_t count, size_t element_size) const {
+        return element_size && contains(offset, 0)
+            && count <= (length - offset) / element_size;
+    }
+
+    template<class T> bool read(size_t offset, T &value) const {
+        if (!contains(offset, sizeof(T))) {
+            return false;
+        }
+        std::memcpy(&value, data + offset, sizeof(T));
+        return true;
+    }
+
+    DumpBuffer slice(size_t offset, size_t bytes) const {
+        if (!contains(offset, bytes)) {
+            return DumpBuffer(nullptr, 0);
+        }
+        return DumpBuffer(data + offset, bytes);
+    }
+
+private:
+    const unsigned char *data;
+    size_t length;
+};
+#endif
 
 /**
  * Same as fopen(), but on error throws an exception rather than returning NULL.

@@ -43,9 +43,14 @@
 #include "nfa/nfa_build_util.h"
 #include "nfa/nfa_dump_api.h"
 #include "nfa/nfa_internal.h"
+#include "nfa/tamaramacompile.h"
 #include "nfagraph/ng_dump.h"
+#include "nfagraph/ng_reports.h"
 #include "som/slot_manager_dump.h"
+#include "smallwrite/smallwrite_internal.h"
 #include "util/compile_context.h"
+#include "util/boundary_reports.h"
+#include "util/report_manager.h"
 #include "util/container.h"
 #include "util/dump_charclass.h"
 #include "fdr/teddy_internal.h"
@@ -56,11 +61,14 @@
 #include "util/ue2string.h"
 
 #include <iomanip>
+#include <algorithm>
+#include <deque>
 #include <numeric>
 #include <ostream>
 #include <set>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #ifndef DUMP_SUPPORT
@@ -2517,6 +2525,780 @@ void dumpRose(const RoseBuildImpl &build, const vector<LitFragment> &fragments,
 
     f = StdioFile(grey.dumpPath + "/rose_struct.txt", "w");
     roseDumpStructRaw(t, f);
+}
+
+// These diagnostics are intentionally separate from dumpRose. Adding an
+// implementation here does not enable any additional output during compilation.
+namespace {
+
+bool readRoseDumpHeader(const RoseEngine *t, size_t bytes, RoseEngine &header,
+                        FILE *f) {
+    if (!DumpBuffer(t, bytes).read(0, header)
+        || header.size < sizeof(header) || header.size > bytes) {
+        fprintf(f, "ERROR: invalid Rose header or allocation size\n");
+        return false;
+    }
+    return true;
+}
+
+struct DumpNfaEntry {
+    u32 queue;
+    u32 offset;
+    // Do not put the cacheline-aligned NFA type into a C++11 std::vector:
+    // std::allocator need not support over-aligned elements before C++17.
+    struct {
+        u8 type;
+        u32 length;
+        u32 streamStateSize;
+    } nfa;
+};
+
+bool readDumpNfas(const DumpBuffer &data, const RoseEngine &header,
+                  vector<DumpNfaEntry> &entries, FILE *f) {
+    if (header.queueCount
+        && (header.nfaInfoOffset < sizeof(RoseEngine)
+            || header.nfaInfoOffset % alignof(NfaInfo)
+            || !data.containsArray(header.nfaInfoOffset, header.queueCount,
+                                    sizeof(NfaInfo)))) {
+        fprintf(f, "ERROR: invalid NFA info table\n");
+        return false;
+    }
+    bool ok = true;
+    for (u32 queue = 0; queue < header.queueCount; queue++) {
+        NfaInfo info;
+        NFA nfa;
+        DumpNfaEntry entry;
+        data.read(header.nfaInfoOffset + size_t(queue) * sizeof(info), info);
+        entry.queue = queue;
+        entry.offset = info.nfaOffset;
+        if (entry.offset < sizeof(RoseEngine)
+            || entry.offset % alignof(NFA)
+            || !data.read(entry.offset, nfa)
+            || nfa.length < sizeof(NFA)
+            || !data.contains(entry.offset, nfa.length)
+            || nfa.type >= INVALID_NFA) {
+            fprintf(f, "ERROR: queue %u has invalid NFA at %u\n", queue,
+                    entry.offset);
+            ok = false;
+            continue;
+        }
+        entry.nfa.type = nfa.type;
+        entry.nfa.length = nfa.length;
+        entry.nfa.streamStateSize = nfa.streamStateSize;
+        entries.push_back(entry);
+    }
+    return ok;
+}
+
+struct DumpRegion {
+    string name;
+    size_t offset;
+    size_t bytes;
+    size_t alignment;
+};
+
+bool printDumpRegions(vector<DumpRegion> regions, size_t total, FILE *f,
+                       const char *gap_name) {
+    sort(regions.begin(), regions.end(),
+         [](const DumpRegion &a, const DumpRegion &b) {
+             return tie(a.offset, a.bytes, a.name) < tie(b.offset, b.bytes, b.name);
+         });
+    bool ok = true;
+    size_t end_offset = 0;
+    fprintf(f, "Region | Offset | Size | Alignment\n");
+    for (const auto &r : regions) {
+        if (r.offset > total || r.bytes > total - r.offset
+            || !r.alignment || r.offset % r.alignment) {
+            fprintf(f, "ERROR: invalid range/alignment for %s (%zu + %zu)\n",
+                    r.name.c_str(), r.offset, r.bytes);
+            ok = false;
+            continue;
+        }
+        if (r.offset > end_offset) {
+            fprintf(f, "%s | %zu | %zu | -\n", gap_name, end_offset,
+                    r.offset - end_offset);
+        } else if (r.offset < end_offset && r.bytes) {
+            fprintf(f, "ERROR: overlapping region %s\n", r.name.c_str());
+            ok = false;
+        }
+        fprintf(f, "%s | %zu | %zu | %zu\n", r.name.c_str(), r.offset,
+                r.bytes, r.alignment);
+        end_offset = max(end_offset, r.offset + r.bytes);
+    }
+    if (end_offset < total) {
+        fprintf(f, "%s | %zu | %zu | -\n", gap_name, end_offset,
+                total - end_offset);
+    }
+    return ok;
+}
+
+vector<DumpRegion> lilyTeddyRegions(const lilyTeddy &header) {
+    return {{"header", 0, sizeof(header), alignof(lilyTeddy)},
+            {"nibble masks", ROUNDUP_CL(sizeof(header)),
+             size_t(header.maxStringLen) * 32, 64},
+            {"report[8]", header.lilyReportOffset, LILY_VEC_LEN * sizeof(u32), 64},
+            {"ekey[8]", header.lilyEkeyOffset, LILY_VEC_LEN * sizeof(u32), 64},
+            {"length[8]", header.lilyLenOffset, LILY_VEC_LEN * sizeof(u32), 64},
+            {"quiet bits", header.lilyQuietOffset, sizeof(u8), 64}};
+}
+
+bool readLilyTeddy(const DumpBuffer &data, size_t offset, lilyTeddy &header,
+                   FILE *f) {
+    if (offset < sizeof(RoseEngine) || offset % 64
+        || !data.read(offset, header) || header.size < sizeof(header)
+        || !data.contains(offset, header.size) || !header.numStrings
+        || header.numStrings > LILY_VEC_LEN || !header.maxStringLen) {
+        fprintf(f, "ERROR: invalid LilyForTeddy header at %zu\n", offset);
+        return false;
+    }
+    const DumpBuffer payload = data.slice(offset, header.size);
+    // Check multiplication before constructing the mask region (also on 32 bit).
+    if (!payload.containsArray(ROUNDUP_CL(sizeof(header)), header.maxStringLen, 32)) {
+        fprintf(f, "ERROR: truncated LilyForTeddy mask table\n");
+        return false;
+    }
+    const auto regions = lilyTeddyRegions(header);
+    size_t end_offset = 0;
+    for (const auto &r : regions) {
+        if (r.offset < end_offset || r.offset % r.alignment
+            || !payload.contains(r.offset, r.bytes)) {
+            fprintf(f, "ERROR: invalid LilyForTeddy region %s\n", r.name.c_str());
+            return false;
+        }
+        end_offset = r.offset + r.bytes;
+    }
+    return true;
+}
+
+void printLilyMaskBytes(const DumpBuffer &masks, size_t position, unsigned slot,
+                        bool inverted, FILE *f) {
+    fprintf(f, "    position -%zu allowed-by-nibble:", position + 1);
+    for (unsigned c = 0; c < 256; c++) {
+        u8 lo = 0, hi = 0;
+        masks.read(position * 32 + (c & 15), lo);
+        masks.read(position * 32 + 16 + (c >> 4), hi);
+        const unsigned bit = 1U << slot;
+        const bool accepts = inverted ? !((lo | hi) & bit) : ((lo & hi) & bit);
+        if (accepts) {
+            fprintf(f, " \\x%02x", c);
+        }
+    }
+    fprintf(f, "\n");
+}
+
+bool checkLilySlot(const DumpBuffer &masks, size_t positions, unsigned slot,
+                   bool inverted, u32 report, u32 ekey, u32 length, bool quiet,
+                   const LilyDumpEntry &source, FILE *f) {
+    bool ok = report == source.external_report && ekey == source.ekey
+           && length == source.literal.size()
+           && quiet == bool(source.flags & HS_FLAG_QUIET);
+    fprintf(f, "    source=\"%s\" internal_report=%u\n",
+            escapeString(source.literal).c_str(), source.internal_report);
+    for (size_t pos = 0; pos < min(positions, source.literal.size()); pos++) {
+        const u8 c = source.literal[source.literal.size() - 1 - pos];
+        const auto accepts = [&](u8 value) {
+            u8 lo = 0, hi = 0;
+            masks.read(pos * 32 + (value & 15), lo);
+            masks.read(pos * 32 + 16 + (value >> 4), hi);
+            const unsigned bit = 1U << slot;
+            return inverted ? !((lo | hi) & bit) : bool((lo & hi) & bit);
+        };
+        ok &= accepts(c);
+        if ((source.flags & HS_FLAG_CASELESS)
+            && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
+            ok &= accepts(c ^ 0x20);
+        }
+    }
+    fprintf(f, "    source-check=%s\n", ok ? "OK" : "MISMATCH");
+    return ok;
+}
+
+set<ReportID> dumpSuffixReports(const RoseSuffixInfo &suffix) {
+    if (suffix.tamarama) {
+        return suffix.tamarama->reports;
+    }
+    if (suffix.haig) {
+        set<ReportID> reports = all_reports(*suffix.haig);
+        for (const auto &state : suffix.haig->state_som) {
+            for (const auto &report : state.reports) {
+                reports.insert(report.report);
+            }
+            for (const auto &report : state.reports_eod) {
+                reports.insert(report.report);
+            }
+        }
+        return reports;
+    }
+    if (suffix.graph) {
+        return all_reports(*suffix.graph);
+    }
+    if (suffix.castle) {
+        return all_reports(*suffix.castle);
+    }
+    if (suffix.rdfa) {
+        return all_reports(*suffix.rdfa);
+    }
+    return {};
+}
+
+string dumpCsvText(const string &text) {
+    string result = "\"";
+    for (char c : escapeString(text)) {
+        if (c == '"') {
+            result += '"';
+        }
+        result += c;
+    }
+    return result + '"';
+}
+
+} // namespace
+
+vector<LilyDumpEntry> collectLilyDumpSlots(const RoseBuildImpl &build,
+                                          bool for_teddy) {
+    vector<LilyDumpEntry> slots;
+    const auto append = [&slots](const string &literal, const lilyReport &r) {
+        slots.push_back({literal, r.internal_id, r.external_report, r.ekey, r.flags});
+    };
+    if (for_teddy) {
+        auto pending = build.lilyForTeddyPQ;
+        while (!pending.empty() && slots.size() < LILY_VEC_LEN) {
+            const auto &entry = pending.top();
+            append(entry.first, entry.second);
+            pending.pop();
+        }
+    } else {
+        for (const auto &entry : build.lily) {
+            append(string(1, entry.first), entry.second);
+        }
+    }
+    return slots;
+}
+
+bool dumpLilySlots(const RoseEngine *t, size_t bytecode_size,
+                   const vector<LilyDumpEntry> &lily_slots,
+                   const vector<LilyDumpEntry> &teddy_slots, FILE *f) {
+    if (!f) {
+        return false;
+    }
+    RoseEngine header;
+    if (!readRoseDumpHeader(t, bytecode_size, header, f)) {
+        return false;
+    }
+    const DumpBuffer data(t, header.size);
+    bool ok = true;
+    if (lily_slots.size() > LILY_VEC_LEN || teddy_slots.size() > LILY_VEC_LEN) {
+        fprintf(f, "ERROR: slot metadata exceeds Lily capacity\n");
+        return false;
+    }
+    if (header.lilyOffset) {
+        const size_t mask_bytes = 32;
+        const size_t report_offset = mask_bytes;
+        const size_t ekey_offset = report_offset + LILY_VEC_LEN * sizeof(u32);
+        const size_t quiet_offset = ekey_offset + LILY_VEC_LEN * sizeof(u32);
+        if (header.lilyOffset < sizeof(header) || header.lilyOffset % 64
+            || !data.contains(header.lilyOffset, quiet_offset + sizeof(u8))) {
+            fprintf(f, "ERROR: invalid Lily payload\n");
+            ok = false;
+        } else {
+            const DumpBuffer payload = data.slice(header.lilyOffset,
+                                                  quiet_offset + sizeof(u8));
+            const DumpBuffer masks = payload.slice(0, mask_bytes);
+            u8 quiet = 0;
+            payload.read(quiet_offset, quiet);
+            fprintf(f, "Lily slots (occupancy requires build-time metadata):\n");
+            for (unsigned i = 0; i < LILY_VEC_LEN; i++) {
+                u32 report = 0, ekey = 0;
+                payload.read(report_offset + i * sizeof(u32), report);
+                payload.read(ekey_offset + i * sizeof(u32), ekey);
+                fprintf(f, "  slot=%u bit=0x%02x report=%u ekey=%u length=1 "
+                           "quiet=%u occupancy=%s\n", i, 1U << i, report, ekey,
+                        unsigned(bool(quiet & (1U << i))), lily_slots.empty()
+                            ? "unknown" : (i < lily_slots.size() ? "active" : "unused"));
+                printLilyMaskBytes(masks, 0, i, false, f);
+                if (i < lily_slots.size()) {
+                    ok &= checkLilySlot(masks, 1, i, false, report, ekey, 1,
+                                        quiet & (1U << i), lily_slots[i], f);
+                }
+            }
+        }
+    } else {
+        fprintf(f, "Lily: absent\n");
+        ok &= lily_slots.empty();
+    }
+    if (header.lilyForTeddyOffset) {
+        lilyTeddy teddy;
+        if (!readLilyTeddy(data, header.lilyForTeddyOffset, teddy, f)) {
+            return false;
+        }
+        const DumpBuffer payload = data.slice(header.lilyForTeddyOffset, teddy.size);
+        const DumpBuffer masks = payload.slice(ROUNDUP_CL(sizeof(teddy)),
+                                               size_t(teddy.maxStringLen) * 32);
+        u8 quiet = 0;
+        payload.read(teddy.lilyQuietOffset, quiet);
+        fprintf(f, "LilyForTeddy slots: masks use zero bits for candidates\n");
+        if (!teddy_slots.empty() && teddy_slots.size() != teddy.numStrings) {
+            fprintf(f, "ERROR: slot metadata count differs from numStrings\n");
+            ok = false;
+        }
+        for (unsigned i = 0; i < teddy.numStrings; i++) {
+            u32 report = 0, ekey = 0, length = 0;
+            payload.read(teddy.lilyReportOffset + i * sizeof(u32), report);
+            payload.read(teddy.lilyEkeyOffset + i * sizeof(u32), ekey);
+            payload.read(teddy.lilyLenOffset + i * sizeof(u32), length);
+            fprintf(f, "  slot=%u bit=0x%02x report=%u ekey=%u length=%u quiet=%u\n",
+                    i, 1U << i, report, ekey, length,
+                    unsigned(bool(quiet & (1U << i))));
+            if (!length || length > teddy.maxStringLen) {
+                fprintf(f, "ERROR: invalid literal length for slot %u\n", i);
+                ok = false;
+            }
+            for (size_t pos = 0; pos < teddy.maxStringLen; pos++) {
+                printLilyMaskBytes(masks, pos, i, true, f);
+            }
+            if (i < teddy_slots.size()) {
+                ok &= checkLilySlot(masks, teddy.maxStringLen, i, true, report,
+                                    ekey, length, quiet & (1U << i), teddy_slots[i], f);
+            }
+        }
+    } else {
+        fprintf(f, "LilyForTeddy: absent\n");
+        ok &= teddy_slots.empty();
+    }
+    return ok && !ferror(f);
+}
+
+bool dumpComponentSummary(const RoseEngine *t, size_t bytecode_size, FILE *f,
+                          size_t top_n) {
+    if (!f) {
+        return false;
+    }
+    RoseEngine header;
+    if (!readRoseDumpHeader(t, bytecode_size, header, f)) {
+        return false;
+    }
+    vector<DumpNfaEntry> entries;
+    const bool ok = readDumpNfas(DumpBuffer(t, header.size), header, entries, f);
+    struct Totals {
+        size_t queues = 0;
+        size_t components = 0;
+        u64a bytes = 0;
+    };
+    map<unsigned, Totals> totals;
+    set<u32> seen;
+    vector<DumpNfaEntry> unique;
+    for (const auto &entry : entries) {
+        auto &total = totals[entry.nfa.type];
+        total.queues++;
+        if (seen.insert(entry.offset).second) {
+            total.components++;
+            total.bytes += entry.nfa.length;
+            unique.push_back(entry);
+        }
+    }
+    fprintf(f, "Queued NFA summary (shared bytecode offsets counted once):\n");
+    fprintf(f, "Engine Type | Queues | Unique Components | Bytecode Bytes\n");
+    for (const auto &entry : totals) {
+        fprintf(f, "%s | %zu | %zu | %llu\n",
+                nfa_type_name(static_cast<NFAEngineType>(entry.first)),
+                entry.second.queues, entry.second.components, entry.second.bytes);
+    }
+    for (bool by_stream : {false, true}) {
+        sort(unique.begin(), unique.end(), [by_stream](const DumpNfaEntry &a,
+                                                       const DumpNfaEntry &b) {
+            const u32 av = by_stream ? a.nfa.streamStateSize : a.nfa.length;
+            const u32 bv = by_stream ? b.nfa.streamStateSize : b.nfa.length;
+            return av != bv ? av > bv : a.queue < b.queue;
+        });
+        fprintf(f, "Top %zu by %s:\n", min(top_n, unique.size()),
+                by_stream ? "stream state bytes" : "bytecode bytes");
+        fprintf(f, "Queue | Offset | Engine Type | Bytecode Bytes | Stream State Bytes\n");
+        for (size_t i = 0; i < min(top_n, unique.size()); i++) {
+            const auto &entry = unique[i];
+            fprintf(f, "%u | %u | %s | %u | %u\n", entry.queue, entry.offset,
+                    nfa_type_name(static_cast<NFAEngineType>(entry.nfa.type)),
+                    entry.nfa.length, entry.nfa.streamStateSize);
+        }
+    }
+    fprintf(f, "Scope: queued NFAs; anchored, SOM reverse and literal matchers "
+               "are separate. Stream state sizes are per component, not summed.\n");
+    return ok && !ferror(f);
+}
+
+bool dumpBytecodeLayout(const RoseEngine *t, size_t bytecode_size, FILE *f) {
+    if (!f) {
+        return false;
+    }
+    RoseEngine header;
+    if (!readRoseDumpHeader(t, bytecode_size, header, f)) {
+        return false;
+    }
+    const DumpBuffer data(t, header.size);
+    bool ok = true;
+    vector<DumpRegion> regions{{"Rose header", 0, sizeof(header), alignof(RoseEngine)}};
+    const auto array = [&](const char *name, u32 offset, size_t count,
+                           size_t width, size_t alignment) {
+        if (!count) {
+            return;
+        }
+        if (offset < sizeof(header) || !data.containsArray(offset, count, width)) {
+            fprintf(f, "ERROR: invalid %s range/count\n", name);
+            ok = false;
+            return;
+        }
+        regions.push_back({name, offset, count * width, alignment});
+    };
+    array("NFA info", header.nfaInfoOffset, header.queueCount, sizeof(NfaInfo),
+          alignof(NfaInfo));
+    array("left NFA info", header.leftOffset, header.roseCount, sizeof(LeftNfaInfo),
+          alignof(LeftNfaInfo));
+    array("report program offsets", header.reportProgramOffset,
+          header.reportProgramCount, sizeof(u32), alignof(u32));
+    array("delay program offsets", header.delayProgramOffset,
+          header.delay_count, sizeof(u32), alignof(u32));
+    array("anchored program offsets", header.anchoredProgramOffset,
+          header.anchored_count, sizeof(u32), alignof(u32));
+    array("inverse dedupe keys", header.invDkeyOffset, header.dkeyCount,
+          sizeof(u32), alignof(u32));
+    array("SOM reverse offsets", header.somRevOffsetOffset, header.somRevCount,
+          sizeof(u32), alignof(u32));
+    array("anchored matcher", header.amatcherOffset, header.asize, 1, 64);
+
+    if (header.outfixBeginQueue > header.outfixEndQueue
+        || header.outfixEndQueue > header.leftfixBeginQueue
+        || header.leftfixBeginQueue > header.queueCount
+        || header.roseCount != header.queueCount - header.leftfixBeginQueue) {
+        fprintf(f, "ERROR: inconsistent queue boundaries/left NFA count\n");
+        ok = false;
+    }
+    vector<DumpNfaEntry> entries;
+    ok &= readDumpNfas(data, header, entries, f);
+    set<u32> seen_nfas;
+    const auto nfa_region = [&](u32 offset, const string &name) {
+        if (!seen_nfas.insert(offset).second) {
+            fprintf(f, "%s aliases NFA at %u\n", name.c_str(), offset);
+            return;
+        }
+        NFA nfa;
+        if (!data.read(offset, nfa) || nfa.length < sizeof(nfa)
+            || nfa.type >= INVALID_NFA) {
+            fprintf(f, "ERROR: invalid NFA header for %s\n", name.c_str());
+            ok = false;
+            return;
+        }
+        regions.push_back({name, offset, nfa.length, alignof(NFA)});
+    };
+    for (const auto &entry : entries) {
+        nfa_region(entry.offset, "NFA queue " + std::to_string(entry.queue));
+    }
+    if (header.somRevCount
+        && data.containsArray(header.somRevOffsetOffset, header.somRevCount, sizeof(u32))) {
+        for (u32 i = 0; i < header.somRevCount; i++) {
+            u32 offset = 0;
+            data.read(header.somRevOffsetOffset + size_t(i) * sizeof(u32), offset);
+            nfa_region(offset, "SOM reverse NFA " + std::to_string(i));
+        }
+    }
+    if (header.longLitTableOffset) {
+        RoseLongLitTable table;
+        if (!data.read(header.longLitTableOffset, table) || table.size < sizeof(table)) {
+            fprintf(f, "ERROR: invalid long literal table\n");
+            ok = false;
+        } else {
+            regions.push_back({"long literal table", header.longLitTableOffset,
+                               table.size, alignof(RoseLongLitTable)});
+        }
+    }
+    if (header.smallWriteOffset) {
+        SmallWriteEngine engine;
+        if (!data.read(header.smallWriteOffset, engine) || engine.size < sizeof(engine)) {
+            fprintf(f, "ERROR: invalid small write engine\n");
+            ok = false;
+        } else {
+            regions.push_back({"small write engine", header.smallWriteOffset,
+                               engine.size, alignof(SmallWriteEngine)});
+        }
+    }
+    if (header.lilyOffset) {
+        const size_t lily_bytes = 32 + 2 * LILY_VEC_LEN * sizeof(u32) + sizeof(u8);
+        regions.push_back({"Lily payload", header.lilyOffset,
+                           lily_bytes, 64});
+        fprintf(f, "Lily relative layout:\n");
+        ok &= printDumpRegions({{"nibble masks", 0, 32, 1},
+                                {"report[8]", 32, 32, alignof(u32)},
+                                {"ekey[8]", 64, 32, alignof(u32)},
+                                {"quiet bits", 96, 1, 1}}, 97, f, "padding");
+        if (data.contains(header.lilyOffset, lily_bytes)) {
+            const DumpBuffer payload = data.slice(header.lilyOffset, lily_bytes);
+            u8 lo_bits = 0, hi_bits = 0, quiet = 0;
+            for (size_t i = 0; i < 16; i++) {
+                u8 lo = 0, hi = 0;
+                payload.read(i, lo);
+                payload.read(16 + i, hi);
+                lo_bits |= lo;
+                hi_bits |= hi;
+            }
+            const u8 active = lo_bits & hi_bits;
+            payload.read(96, quiet);
+            if (quiet & ~active) {
+                fprintf(f, "ERROR: Lily quiet flags refer to unused slots\n");
+                ok = false;
+            }
+            for (unsigned i = 0; i < LILY_VEC_LEN; i++) {
+                u32 ekey = 0;
+                payload.read(64 + i * sizeof(u32), ekey);
+                if ((active & (1U << i)) && ekey != INVALID_EKEY
+                    && ekey >= header.ekeyCount) {
+                    fprintf(f, "ERROR: invalid Lily slot %u ekey\n", i);
+                    ok = false;
+                }
+            }
+        }
+    }
+    if (header.lilyForTeddyOffset) {
+        lilyTeddy teddy;
+        if (readLilyTeddy(data, header.lilyForTeddyOffset, teddy, f)) {
+            regions.push_back({"LilyForTeddy payload", header.lilyForTeddyOffset,
+                               teddy.size, 64});
+            fprintf(f, "LilyForTeddy relative layout:\n");
+            ok &= printDumpRegions(lilyTeddyRegions(teddy), teddy.size, f, "padding");
+            const DumpBuffer payload = data.slice(header.lilyForTeddyOffset, teddy.size);
+            u8 quiet = 0;
+            payload.read(teddy.lilyQuietOffset, quiet);
+            if (quiet & ~((1U << teddy.numStrings) - 1)) {
+                fprintf(f, "ERROR: LilyForTeddy quiet flags refer to unused slots\n");
+                ok = false;
+            }
+            for (u32 i = 0; i < teddy.numStrings; i++) {
+                u32 length = 0, ekey = 0;
+                payload.read(teddy.lilyLenOffset + i * sizeof(u32), length);
+                payload.read(teddy.lilyEkeyOffset + i * sizeof(u32), ekey);
+                if (!length || length > teddy.maxStringLen
+                    || (ekey != INVALID_EKEY && ekey >= header.ekeyCount)) {
+                    fprintf(f, "ERROR: invalid LilyForTeddy slot %u length/ekey\n", i);
+                    ok = false;
+                }
+            }
+        } else {
+            ok = false;
+        }
+    }
+    // Variable-length programs and matcher implementations do not all carry a
+    // length here. Show their starts without claiming that gaps are padding.
+    const pair<const char *, u32> markers[] = {
+        {"floating matcher", header.fmatcherOffset},
+        {"delayed rebuild matcher", header.drmatcherOffset},
+        {"EOD matcher", header.ematcherOffset},
+        {"small block matcher", header.sbmatcherOffset},
+        {"EOD program", header.eodProgramOffset},
+        {"flush combination program", header.flushCombProgramOffset},
+        {"last flush combination program", header.lastFlushCombProgramOffset},
+        {"boundary EOD program", header.boundary.reportEodOffset},
+        {"boundary zero program", header.boundary.reportZeroOffset},
+        {"boundary zero EOD program", header.boundary.reportZeroEodOffset}};
+    for (const auto &marker : markers) {
+        if (!marker.second) {
+            continue;
+        }
+        const bool valid = marker.second >= sizeof(header) && data.contains(marker.second, 1);
+        fprintf(f, "%s | offset-only=%u | %s\n", marker.first, marker.second,
+                valid ? "OK" : "OUT OF RANGE");
+        ok &= valid;
+    }
+    fprintf(f, "Rose bytecode layout (offsets relative to Rose base):\n");
+    ok &= printDumpRegions(regions, data.size(), f, "unclassified");
+    fprintf(f, "Structural checks: %s (engine instruction bodies not validated)\n",
+            ok ? "OK" : "FAILED");
+    return ok && !ferror(f);
+}
+
+bool dumpRuleDependencies(const RoseBuildImpl &build,
+                          const vector<LitFragment> &fragments,
+                          const map<left_id, u32> &leftfix_queue_map,
+                          const map<suffix_id, u32> &suffix_queue_map,
+                          const vector<LilyDumpEntry> &teddy_slots,
+                          const RoseEngine *t, size_t bytecode_size, FILE *f) {
+    if (!f) {
+        return false;
+    }
+    RoseEngine header;
+    if (!readRoseDumpHeader(t, bytecode_size, header, f)) {
+        return false;
+    }
+    vector<DumpNfaEntry> entries;
+    bool ok = readDumpNfas(DumpBuffer(t, header.size), header, entries, f);
+    map<u32, string> engine_names;
+    for (const auto &entry : entries) {
+        engine_names[entry.queue] = nfa_type_name(static_cast<NFAEngineType>(entry.nfa.type));
+    }
+    map<u32, set<u32>> fragment_ids;
+    for (const auto &fragment : fragments) {
+        for (u32 literal : fragment.lit_ids) {
+            fragment_ids[literal].insert(fragment.fragment_id);
+        }
+    }
+    const RoseGraph &g = build.g;
+    const auto &reports = build.rm.reports();
+    fprintf(f, "External ID,Internal Report,Report Type,Internal Target,Relation,"
+               "Role,Literal ID,Literal Text,Fragment,Queue,Engine,Matcher Slot\n");
+    // Use strings for missing columns, so ID zero is never mistaken for absent.
+    const auto emit = [&](ReportID report, const string &relation,
+                          const string &role, const string &literal,
+                          const string &fragment, const string &queue,
+                          const string &engine, const string &text,
+                          const string &slot) {
+        if (report >= reports.size()) {
+            fprintf(f, "ERROR: invalid internal report %u\n", report);
+            ok = false;
+            return;
+        }
+        const Report &r = reports[report];
+        if (isExternalReport(r)) {
+            fprintf(f, "%u,%u,%u,,", r.onmatch, report, unsigned(r.type));
+        } else {
+            // Internal onmatch values are SOM locations/top events, not rule IDs.
+            fprintf(f, ",%u,%u,%u,", report, unsigned(r.type), r.onmatch);
+        }
+        fprintf(f, "%s,%s,%s,%s,%s,%s,%s,%s\n", relation.c_str(), role.c_str(),
+                literal.c_str(), dumpCsvText(text).c_str(), fragment.c_str(),
+                queue.c_str(), engine.c_str(), slot.c_str());
+    };
+    const auto emit_role = [&](ReportID report, const string &relation,
+                               RoseVertex vertex, u32 queue) {
+        const string queue_id = queue == MO_INVALID_IDX ? "" : std::to_string(queue);
+        string engine = "Rose";
+        if (queue != MO_INVALID_IDX) {
+            const auto it = engine_names.find(queue);
+            if (it == engine_names.end()) {
+                fprintf(f, "ERROR: unresolved queue %u\n", queue);
+                ok = false;
+                engine = "unresolved";
+            } else {
+                engine = it->second;
+            }
+        }
+        const string role = std::to_string(g[vertex].index);
+        if (g[vertex].literals.empty()) {
+            emit(report, relation, role, "", "", queue_id, engine, "", "");
+        }
+        for (u32 literal : g[vertex].literals) {
+            string text;
+            if (literal < build.literals.size()) {
+                text = build.literals.at(literal).s.get_string();
+            } else {
+                fprintf(f, "ERROR: invalid literal %u\n", literal);
+                ok = false;
+            }
+            const auto it = fragment_ids.find(literal);
+            if (it == fragment_ids.end()) {
+                emit(report, relation, role, std::to_string(literal), "", queue_id,
+                     engine, text, "");
+            } else {
+                for (u32 fragment : it->second) {
+                    emit(report, relation, role, std::to_string(literal),
+                         std::to_string(fragment), queue_id, engine, text, "");
+                }
+            }
+        }
+    };
+    map<RoseVertex, set<ReportID>> terminal_reports;
+    for (RoseVertex vertex : vertices_range(g)) {
+        auto &terminal = terminal_reports[vertex];
+        terminal.insert(g[vertex].reports.begin(), g[vertex].reports.end());
+        for (ReportID report : g[vertex].reports) {
+            emit_role(report, "direct", vertex, MO_INVALID_IDX);
+        }
+        if (g[vertex].suffix) {
+            const suffix_id suffix(g[vertex].suffix);
+            const auto suffix_reports = dumpSuffixReports(g[vertex].suffix);
+            terminal.insert(suffix_reports.begin(), suffix_reports.end());
+            const auto it = suffix_queue_map.find(suffix);
+            if (it == suffix_queue_map.end()) {
+                fprintf(f, "ERROR: missing suffix queue for role %zu\n", g[vertex].index);
+                ok = false;
+            }
+            for (ReportID report : suffix_reports) {
+                emit_role(report, "suffix", vertex,
+                          it == suffix_queue_map.end() ? MO_INVALID_IDX : it->second);
+            }
+        }
+    }
+    // Reverse propagation reaches a fixed point even when the graph has cycles.
+    // Sets preserve shared reports and do not assume one rule per role/engine.
+    auto reachable = terminal_reports;
+    deque<RoseVertex> pending;
+    set<RoseVertex> queued;
+    for (RoseVertex vertex : vertices_range(g)) {
+        pending.push_back(vertex);
+        queued.insert(vertex);
+    }
+    while (!pending.empty()) {
+        const RoseVertex vertex = pending.front();
+        pending.pop_front();
+        queued.erase(vertex);
+        for (const auto &edge : in_edges_range(vertex, g)) {
+            const RoseVertex predecessor = source(edge, g);
+            auto &dest = reachable[predecessor];
+            const size_t previous = dest.size();
+            dest.insert(reachable[vertex].begin(), reachable[vertex].end());
+            if (dest.size() != previous && queued.insert(predecessor).second) {
+                pending.push_back(predecessor);
+            }
+        }
+    }
+    for (RoseVertex vertex : vertices_range(g)) {
+        if (vertex == build.root || vertex == build.anchored_root) {
+            continue;
+        }
+        u32 queue = MO_INVALID_IDX;
+        if (g[vertex].left) {
+            const auto it = leftfix_queue_map.find(left_id(g[vertex].left));
+            if (it == leftfix_queue_map.end()) {
+                fprintf(f, "ERROR: missing leftfix queue for role %zu\n", g[vertex].index);
+                ok = false;
+            } else {
+                queue = it->second;
+            }
+        }
+        for (ReportID report : reachable[vertex]) {
+            emit_role(report, g[vertex].left ? "leftfix-dependency" : "reachable",
+                      vertex, queue);
+        }
+    }
+    for (const auto &outfix : build.outfixes) {
+        if (outfix.is_dead()) {
+            continue;
+        }
+        const u32 queue = outfix.get_queue();
+        const auto name = engine_names.find(queue);
+        if (name == engine_names.end()) {
+            fprintf(f, "ERROR: unresolved outfix queue %u\n", queue);
+            ok = false;
+        }
+        for (ReportID report : all_reports(outfix)) {
+            emit(report, "outfix", "", "", "", std::to_string(queue),
+                 name == engine_names.end() ? "unresolved" : name->second, "", "");
+        }
+    }
+    const pair<const char *, const set<ReportID> *> boundaries[] = {
+        {"boundary-zero", &build.boundary.report_at_0},
+        {"boundary-zero-eod", &build.boundary.report_at_0_eod},
+        {"boundary-eod", &build.boundary.report_at_eod}};
+    for (const auto &boundary : boundaries) {
+        for (ReportID report : *boundary.second) {
+            emit(report, boundary.first, "", "", "", "", "Rose", "", "");
+        }
+    }
+    for (const auto &entry : build.lily) {
+        emit(entry.second.internal_id, "lily-slot", "", "", "", "", "Lily",
+             string(1, entry.first), "");
+    }
+    for (size_t i = 0; i < teddy_slots.size(); i++) {
+        const auto &entry = teddy_slots[i];
+        emit(entry.internal_report, "lily-teddy-slot", "", "", "", "", "LilyForTeddy",
+             entry.literal, std::to_string(i));
+    }
+    return ok && !ferror(f);
 }
 
 } // namespace ue2

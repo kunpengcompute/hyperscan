@@ -37,9 +37,13 @@
 #include "teddy_engine_description.h"
 #include "teddy_internal.h"
 #include "ue2common.h"
+#include "util/dump_util.h"
 
+#include <algorithm>
 #include <cstdio>
+#include <map>
 #include <memory>
+#include <vector>
 
 #ifndef DUMP_SUPPORT
 #error No dump support!
@@ -205,6 +209,159 @@ void fdrPrintStats(const FDR *fdr, FILE *f) {
     } else {
         dumpFDR(fdr, f);
     }
+}
+
+bool dumpConfirmChains(const FDR *fdr, size_t bytecode_size, FILE *f) {
+    if (!f) {
+        return false;
+    }
+    // FDR and Teddy share these first six fields. Read by copy so that even a
+    // malformed offset or an unaligned input cannot cause an unchecked load.
+    Teddy header;
+    DumpBuffer input(fdr, bytecode_size);
+    if (!input.read(0, header) || header.size < sizeof(header)
+        || header.size > bytecode_size) {
+        fprintf(f, "ERROR: invalid FDR/Teddy header or allocation size\n");
+        return false;
+    }
+    const DumpBuffer data = input.slice(0, header.size);
+    u32 buckets = 0;
+    if (auto des = getFdrDescription(header.engineID)) {
+        buckets = des->getNumBuckets();
+    } else if (auto teddy_des = getTeddyDescription(header.engineID)) {
+        buckets = teddy_des->getNumBuckets();
+    } else {
+        fprintf(f, "ERROR: unknown engine %u\n", header.engineID);
+        return false;
+    }
+    fprintf(f, "Confirmation chains: engine %u, buckets %u\n",
+            header.engineID, buckets);
+    if (!header.confOffset && !header.numStrings) {
+        fprintf(f, "No confirmation entries.\n");
+        return !ferror(f);
+    }
+    if (header.confOffset < sizeof(header)
+        || header.confOffset % alignof(u32)
+        || !data.containsArray(header.confOffset, buckets, sizeof(u32))) {
+        fprintf(f, "ERROR: invalid confirmation switch table\n");
+        return false;
+    }
+    size_t end_offset = data.size();
+    if (header.floodOffset) {
+        if (header.floodOffset <= header.confOffset
+            || header.floodOffset > data.size()) {
+            fprintf(f, "ERROR: invalid flood table offset\n");
+            return false;
+        }
+        end_offset = header.floodOffset;
+    }
+    const DumpBuffer tables = data.slice(header.confOffset,
+                                         end_offset - header.confOffset);
+    vector<u32> offsets(buckets);
+    for (u32 i = 0; i < buckets; i++) {
+        if (!tables.read(i * sizeof(u32), offsets[i])) {
+            fprintf(f, "ERROR: truncated confirmation switch table\n");
+            return false;
+        }
+    }
+
+    bool ok = true;
+    size_t all_used = 0, all_collisions = 0, all_entries = 0, longest = 0;
+    map<size_t, size_t> histogram;
+    for (u32 bucket = 0; bucket < buckets; bucket++) {
+        const size_t offset = offsets[bucket];
+        if (!offset) {
+            fprintf(f, "bucket %u: empty\n", bucket);
+            continue;
+        }
+        size_t limit = tables.size();
+        for (u32 other : offsets) {
+            if (other > offset) {
+                limit = min(limit, size_t(other));
+            }
+        }
+        if (offset < ROUNDUP_CL(buckets * sizeof(u32))
+            || offset >= limit || offset % alignof(FDRConfirm)) {
+            fprintf(f, "ERROR: bucket %u has invalid confirm offset %zu\n",
+                    bucket, offset);
+            ok = false;
+            continue;
+        }
+        const DumpBuffer table = tables.slice(offset, limit - offset);
+        FDRConfirm confirm;
+        const size_t index_offset = ROUNDUP_N(sizeof(confirm), alignof(u32));
+        if (!table.read(0, confirm) || confirm.nBits >= 32
+            || !table.containsArray(index_offset, size_t(1) << confirm.nBits,
+                                     sizeof(u32))) {
+            fprintf(f, "ERROR: bucket %u has invalid header/hash index\n", bucket);
+            ok = false;
+            continue;
+        }
+        const size_t slots = size_t(1) << confirm.nBits;
+        const size_t literal_start = ROUNDUP_N(index_offset + slots * sizeof(u32),
+                                               alignof(LitInfo));
+        size_t used = 0, collisions = 0, entries = 0, max_chain = 0;
+        fprintf(f, "bucket %u: slots %zu, groups 0x%016llx\n",
+                bucket, slots, confirm.groups);
+        for (size_t slot = 0; slot < slots; slot++) {
+            u32 relative = 0;
+            table.read(index_offset + slot * sizeof(u32), relative);
+            if (!relative) {
+                histogram[0]++;
+                continue;
+            }
+            size_t pos = relative, chain = 0;
+            bool complete = false;
+            do {
+                LitInfo lit;
+                if (pos < literal_start || pos % alignof(LitInfo)
+                    || !table.read(pos, lit)) {
+                    fprintf(f, "ERROR: bucket %u hash %zu invalid LitInfo at %zu\n",
+                            bucket, slot, pos);
+                    ok = false;
+                    break;
+                }
+                fprintf(f, "  hash %zu entry %zu: id=%u length=%u "
+                           "v=0x%016llx msk=0x%016llx groups=0x%016llx "
+                           "flags=0x%02x next=%u\n",
+                        slot, chain, lit.id, lit.size, lit.v, lit.msk,
+                        lit.groups, unsigned(lit.flags), unsigned(lit.next));
+                if (!lit.size || lit.size > sizeof(CONF_TYPE)
+                    || (lit.v & lit.msk) != lit.v) {
+                    fprintf(f, "ERROR: invalid literal length/value mask\n");
+                    ok = false;
+                }
+                chain++;
+                pos += sizeof(lit); // next is a continuation flag, not a byte offset.
+                complete = !lit.next;
+            } while (!complete);
+            if (!complete) {
+                continue; // Do not include truncated chains in the statistics.
+            }
+            used++;
+            entries += chain;
+            collisions += chain > 1;
+            max_chain = max(max_chain, chain);
+            histogram[chain]++;
+        }
+        fprintf(f, "  used=%zu/%zu collisions=%zu entries=%zu "
+                   "average_nonempty_chain=%.2f longest_chain=%zu\n",
+                used, slots, collisions, entries,
+                used ? double(entries) / used : 0.0, max_chain);
+        all_used += used;
+        all_collisions += collisions;
+        all_entries += entries;
+        longest = max(longest, max_chain);
+    }
+    fprintf(f, "Total: used=%zu collisions=%zu entries=%zu "
+               "average_nonempty_chain=%.2f longest_chain=%zu\n",
+            all_used, all_collisions, all_entries,
+            all_used ? double(all_entries) / all_used : 0.0, longest);
+    fprintf(f, "Chain length histogram (length: hash slots):\n");
+    for (const auto &entry : histogram) {
+        fprintf(f, "  %zu: %zu\n", entry.first, entry.second);
+    }
+    return ok && !ferror(f);
 }
 
 } // namespace ue2

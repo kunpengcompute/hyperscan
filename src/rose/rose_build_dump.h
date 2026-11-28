@@ -32,6 +32,8 @@
 #include "ue2common.h"
 
 #include <map>
+#include <cstddef>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -58,6 +60,43 @@ void dumpRose(const RoseBuildImpl &build,
 
 void dumpMatcherLiterals(const std::vector<hwlmLiteral> &lits,
                          const std::string &name, const Grey &grey);
+
+// Optional diagnostics only: deliberately not called by dumpRose or hsdump.
+// The caller owns FILE*, and supplies the actual readable bytecode size.
+struct LilyDumpEntry {
+    std::string literal;
+    u32 internal_report;
+    u32 external_report;
+    u32 ekey;
+    unsigned flags;
+};
+
+// For Teddy, call BEFORE buildRose consumes lilyForTeddyPQ. Copies the queue
+// without changing compilation; the returned vector preserves bucket order.
+std::vector<LilyDumpEntry> collectLilyDumpSlots(const RoseBuildImpl &build,
+                                               bool for_teddy);
+
+// Empty metadata vectors still allow raw slot/mask decoding, but cannot
+// validate source literals or determine which ordinary Lily slots are active.
+bool dumpLilySlots(const RoseEngine *t, size_t bytecode_size,
+                   const std::vector<LilyDumpEntry> &lily_slots,
+                   const std::vector<LilyDumpEntry> &teddy_slots, FILE *f);
+
+bool dumpComponentSummary(const RoseEngine *t, size_t bytecode_size, FILE *f,
+                          size_t top_n = 10);
+
+// Layout and structural checks for the Rose tables, queued NFAs and Lily
+// payloads; this is not a complete validator for every engine's instructions.
+bool dumpBytecodeLayout(const RoseEngine *t, size_t bytecode_size, FILE *f);
+
+// Call after queue assignment while build-time graphs/reports still exist.
+// Reachability expresses a structural dependency, not proof of a match.
+bool dumpRuleDependencies(const RoseBuildImpl &build,
+                          const std::vector<LitFragment> &fragments,
+                          const std::map<left_id, u32> &leftfix_queue_map,
+                          const std::map<suffix_id, u32> &suffix_queue_map,
+                          const std::vector<LilyDumpEntry> &teddy_slots,
+                          const RoseEngine *t, size_t bytecode_size, FILE *f);
 
 #else
 
